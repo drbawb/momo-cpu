@@ -20,8 +20,8 @@ struct P150Cpu {
 impl P150Cpu {
 	fn new() -> P150Cpu {
 		P150Cpu {
-			ip:  0x0,
-			ir:  0x00,
+			ip:  0x00,
+			ir:  0x0000,
 
 			reg: [0u8, ..16],
 			mem: [0u8, ..256],
@@ -29,7 +29,7 @@ impl P150Cpu {
 	}
 
 	fn dump(&self) {
-		println!("IP: {}, IR: {}", self.ip, self.ir);
+		println!("IP: 0x{:02X}, IR: 0x{:04X}", self.ip, self.ir);
 
 		println!("Registers")
 		for (addr, cell) in self.reg.iter().enumerate() {
@@ -87,7 +87,7 @@ impl P150Cpu {
 		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16);
 		self.ip += 2;
 		
-		debug!("IR set to {} ({},{})", self.ir, byte_1, byte_2)
+		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
 	}
 }
 
