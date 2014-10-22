@@ -1,0 +1,126 @@
+PANTHER-150
+===
+
+The PANTHER-150 is a fictional CPU designed by the students of UWM's CS-150 course, Survey of Computer Science.
+This is an emulator for that CPU, the machine specifications are printed below.
+
+
+CPU
+===
+
+Register Width:     8-bits
+Reg. Address Width: 4-bits
+Reg. Addresses:     0-15 	(0-F)
+
+PC: 08-bits
+IR: 16-bits
+
+MEMORY
+===
+Cell Width:    8-bits
+Address Width: 8-bits
+Addresses:     0-255 	(00-FF)
+
+INSTRUCTIONS
+===
+
+These 12 instructions are encoded as a 4-bit opcode followed by up to 12-bits of operands.
+Thus each instruction is (up to) 16-bits wide.
+
+## Instruction Table
+
+OPCODE | INSTRUCTION
+-------|------------
+0x0    |  ADDB
+0x1    |  ADDF
+0x2    |   ROT
+0x3    |   AND
+0x4    |    OR
+0x5    |   XOR
+0x6    | MLOAD
+0x7    | MSTOR
+0x8    |  RMOV
+0x9    |  RSET
+0xA    | JMPEQ
+0xB    |   HLT
+
+### Bitstring Operations (6 instructions)
+
+ADDB: "Add Binary"	(12-bits)
+	* Adds two numbers together, assuming they are encoded as 2's complement 8-bit.
+	* Requires three register addresses: (R1, R2, R3)
+	* The result of `R1+R2` will be stored in `R3`
+
+ADDF: "Add Float"	(12-bits)
+	* Adds two numbers together, assuming they are encoded as `<to be specified>` floating point numbers.
+	* Requires three register addresses: (R1, R2, R3)
+	* The result of `R1+R2` will be stored in `R3`
+
+ROT: "Rotate" 	(8-bits)
+	* Rotates some bitstring leftwise. As the MSB falls off it wraps around to the LSB.
+	* Requires one register address (R1) as well as a 4-bit constant indicating number of bits to shift.
+	  * (Shifts greater than 0100 are redundant.)
+
+AND, OR, XOR: "Logical Operations",  (12-bits)
+	* Produces the logical `(AND | OR | XOR)` of two bitstrings.
+	* Requires three register addresses: (R1, R2, R3)
+	* Stores the result of `R1 <op> R2` in `R3`
+
+### Memory Operations (4 instructions)
+
+MLOAD: "Memory Cell Load" (12-bits)
+	* Loads the value from a memory cell into a register.
+	* Requires one register address (R1) as well as an 8-bit constant representing a memory address.
+
+MSTOR: "Memory Cell Store" (12-bits)
+	* Stores the value from a register into a memory cell
+	* Requires one regiser address as well as an 8-bit constant representing a memory address.
+
+RMOV: "Register Move" (8-bits)
+	* Moves a value from one register location to another.
+	* Requires one register address as well as a 4-bit constant representing a register address.
+
+RSET: "Register Set" (12-bits)
+	* Loads a constant value into a register location.
+	* Requires one register address (R0) as well as an 8-bit constant
+
+### Programmability (2 instructions)
+
+JMPEQ: "Jump if equal" (12-bits)
+	* Requires one register address (R1) as well as one memory address (M1)
+	* R1 is compared to the first register (0x0), if the bitstrings are identical
+	 then the program counter is set to `M1`
+	* Otherwise the program counter remains unchanged
+
+HLT: "Halt Machine"
+	* Stops machine ...
+
+
+### Hello, World.
+
+This is a sample program designed to test the machine.
+  * The program loads two numbers: 12 (0b00001100) and 30 (0b00011110) into registers 4 (0x3) and 5 (0x4).
+  * Then the program performs a twos complement addition, storing the result in register 6 (0x5).
+  * The program then moves register 6 (0x5) to memory cell 1 (0x00)
+  * The program then loads memory cell 1 (0x00) to register 1 (0x0)
+  * The program then checks that register 6 is equal to register 1.
+  * If it is the program will store a 1 in register 2 (0x1)
+  * If it is not the program will store a 0 in register 2 (0x1)
+  * Then the program will halt.
+
+This tests: arithmetic, register moves, memory moves, branching, and halting.
+
+---
+
+Emulator Notes
+===
+
+* The current CPU and memory state will only be printed when the program halts.
+* Each emulator tick processes exactly one opcode.
+* Programs must be fed in using the following format: 
+  * 1 instruction per line, as hex in the format `0x_:`
+  * Each instruction followed by a space, and then the operands.
+  * Each operand separated by spaces.
+  * e.g: To add R1 and R2 to R16: `0x0: 0x0 0x1 0xF`
+	* Read as `ADDB (R1+R2) => (R16)`
+* Programs are read from STDIN.

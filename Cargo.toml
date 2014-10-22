@@ -1,0 +1,5 @@
+[package]
+
+name = "panther-150"
+version = "0.0.1"
+authors = ["Robert Straw <drbawb@fatalsyntax.com>"]
