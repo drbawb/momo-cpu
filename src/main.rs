@@ -42,9 +42,9 @@ impl P150Cpu {
 	fn dump(&self) {
 		println!("IP: 0x{:02X}, IR: 0x{:04X}", self.ip, self.ir);
 
-		println!("Registers")
+		println!("---\nRegisters\n---")
 		for (addr, cell) in self.reg.iter().enumerate() {
-			println!("{}: {}", addr, cell)
+			println!("{:01X}: {}", addr, cell)
 		}
 
 	#[cfg(test)]
@@ -52,7 +52,7 @@ impl P150Cpu {
 		self.reg
 	}
 
-	/// Read an array of instructions into memory
+	/// Read an array of instructions into main memory
 	/// This reads two bytes at a time from the `memory` array
 	/// and loads them into the P150s RAM bank, starting from address 0.
 	fn init_mem(&mut self, memory: &[u16]) {
@@ -137,7 +137,7 @@ impl P150Cpu {
 			},
 
 			0x9   => { // RSET
-				let rloc = ((self.ir >> 8) as u8) & U4_LOW;  // lower nibble of first byte
+				let rloc = l_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
 
 				self.reg[rloc as uint] = rval;               // store value in register
@@ -184,7 +184,7 @@ fn h_nibble(byte: u8) -> u8 {
 
 fn main() {
 	let mut cpu = P150Cpu::new();
-	let program = [0x902A, 0x911E, 0x920C, 0x0123, 0x8310, 0xA106, 0xB000];
+	let program = [0x911E, 0x920C, 0x0123, 0x7340, 0x6040, 0xA310, 0x9500, 0xB000, 0x9501, 0xB000];
 	cpu.init_mem(program);
 
 	loop {
