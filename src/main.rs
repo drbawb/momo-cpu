@@ -2,8 +2,9 @@
 #[phase(plugin, link)] extern crate log;
 
 // masks for pulling nibbles out of bytes
-const U4_LOW:  u8 = 0b00001111;
-const U4_HIGH: u8 = 0b11110000;
+const BYTE_WIDTH: uint = 8;
+const U4_LOW:     u8   = 0b00001111;
+const U4_HIGH:    u8   = 0b11110000;
 
 
 /// If the CPU enters the `Halt` state then any additional ticks will result in
@@ -110,7 +111,7 @@ impl P150Cpu {
 				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
 				//   ∴ LHS <OR> RHS provides a rotated bitstring
 				let x = self.reg[rloc_i0 as uint];
-				self.reg[rloc_i0 as uint] = (x << swidth) | (x >> (8 - swidth));
+				self.reg[rloc_i0 as uint] = (x << swidth) | (x >> (BYTE_WIDTH - swidth));
 
 				Continue
 			},
