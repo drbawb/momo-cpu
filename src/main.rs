@@ -229,7 +229,7 @@ fn main() {
 
 #[test]
 fn test_hammer_time() {
-	// cpu should stop
+	// cpu should stop after 1 tick of this program
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0xB000]);
 
@@ -241,10 +241,7 @@ fn test_registers() {
 	// cpu should set, move registers accordingly
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x9110, 0x8130, 0xB000]);
-
-	loop {
-		if cpu.tick() == Halt { break; }
-	}
+	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], 16)
 }
@@ -255,10 +252,7 @@ fn test_memory() {
 	// uninitialized registers should not match initialized registers
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x9120, 0x9330, 0x7140, 0x6240, 0xB000]);
-
-	loop {
-		if cpu.tick() == Halt { break; }
-	}
+	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
 	assert!(cpu.get_reg()[0x1] != cpu.get_reg()[0x3]);
@@ -266,12 +260,10 @@ fn test_memory() {
 
 #[test]
 fn test_bin() {
+	// tests the various binary operations against their rustc counterparts.
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x9121, 0x9222, 0x3123, 0x4124, 0x5125, 0xB000]);
-
-	loop {
-		if cpu.tick() == Halt { break; }
-	}
+	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x3] == (0x21 & 0x22));
 	assert!(cpu.get_reg()[0x4] == (0x21 | 0x22));
@@ -280,37 +272,40 @@ fn test_bin() {
 
 #[test]
 fn test_math() {
+	// tests basic 2s comp. addition
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x9120, 0x920A, 0x0123, 0xB000]);
-
-	loop {
-		if cpu.tick() == Halt { break; }
-	}
+	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2])
 }
 
 #[test]
 fn test_branch() {
+	// checks that the program branches; skipping a halt and setting a status register
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x9021, 0x9121, 0xA108, 0xB000, 0x922A, 0xB000]);
-
-	loop {
-		if cpu.tick() == Halt { break; }
-	}
+	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x2], 0x2A)
 }
 
 #[test]
 fn test_shift() {
+	// checks that the program rotates a single nibble 4 places
+	// this should move a single hex digit from the lhs to the rhs.
+	//
 	let mut cpu = P150Cpu::new();
 	cpu.init_mem([0x90B0, 0x2040, 0xB000]);
+	boot(&mut cpu);
 
+	assert_eq!(cpu.get_reg()[0x0], 0x0B)
+}
+
+#[cfg(test)]
+fn boot(cpu: &mut P150Cpu) {
 	loop {
 		if cpu.tick() == Halt { break; }
 	}
-
-	assert_eq!(cpu.get_reg()[0x0], 0x0B)
 }
 
