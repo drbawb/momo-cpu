@@ -1,9 +1,17 @@
-PANTHER-150
+Project MOMO
 ===
 
-The PANTHER-150 is a fictional CPU designed by the students of UWM's CS-150 course, Survey of Computer Science.
-This is an emulator for that CPU, the machine specifications are printed below.
+The PANTHER-150, or P150, is a fictional CPU designed during the UWM CS150 course: Survey of Computer Science.
+This is an emulator for the CPU as described in class. Opcodes are arbitrarily assigned and do not necessarily
+match those described in the text.
 
+The order of operands for any given instruction may also deviate from what's in the text.
+In general the P150 instructions prefer to pack nibbles towards the front, and full bytes towards
+the end of an instruction.
+
+This program is protected by copyright; modification and distribution are permitted 
+freely under the terms of a BSD-style license. See the `LICENSE`, which should have 
+been included with your copy of the software, for additional details.
 
 CPU
 ===
@@ -16,18 +24,19 @@ PC: 08-bits
 IR: 16-bits
 
 MEMORY
-===
+======
+
 Cell Width:    8-bits
 Address Width: 8-bits
 Addresses:     0-255 	(00-FF)
 
 INSTRUCTIONS
-===
+============
 
 These 12 instructions are encoded as a 4-bit opcode followed by up to 12-bits of operands.
 Thus each instruction is (up to) 16-bits wide.
 
-## Instruction Table
+### Instruction Table
 
 OPCODE | INSTRUCTION
 -------|------------
@@ -44,71 +53,121 @@ OPCODE | INSTRUCTION
 0xA    | JMPEQ
 0xB    |   HLT
 
+Instructions are encoded as 2 bytes, or four hexadecimal digits.
+An opcode (1-hex) followed by _up to_ three additional hex digits.
+
+	0x_ _ _ _
+	  | | | L----> third hex
+	  | | L------> second hex
+      | L--------> first hex
+      L----------> opcode
+
+An example of a `0-hex` instruction is the HLT instruction
+
+	0xB 0 0 0
+	  | |
+	  | |
+      | L-----> unused
+      L-------> opcode 	(halt)
+
+
+An example of a `3-hex` instruction where each hex is a single operand 
+is the addition instruction:
+
+	0x1 2 4 6
+	  | | | L----> output       (register 6)
+	  | | L------> second input (register 4) then
+      | L--------> first input  (register 2) to
+      L----------> opcode       (add)
+
+A slightly different example of a `3-hex` instruction is memory storage.
+Here the second and third hex, together, are used to describe a memory location:
+
+	0x7 2 4 F
+	  | | | 
+	  | | L-----> output loc.	(address 4F)
+      | L-------> data value 	(register 2) 
+      L---------> opcode		(mstor)
+
+
 ### Bitstring Operations (6 instructions)
 
-ADDB: "Add Binary"	(12-bits)
+ADDB: "Add Binary"	(12-bits / 3-hex)
+	* `ADDB <IN1: 4-bit register name> <IN2: 4-bit register name> <OUT1: 4-bit register name>`
 	* Adds two numbers together, assuming they are encoded as 2's complement 8-bit.
 	* Requires three register addresses: (R1, R2, R3)
 	* The result of `R1+R2` will be stored in `R3`
 
-ADDF: "Add Float"	(12-bits)
+ADDF: "Add Float"	(12-bits / 3-hex)
+	* `ADDF <IN1: 4-bit register name> <IN2: 4-bit register name> <OUT1: 4-bit register name>`
+	* Adds two numbers together, assuming they are encoded as 2's complement 8-bit.
 	* Adds two numbers together, assuming they are encoded as `<to be specified>` floating point numbers.
 	* Requires three register addresses: (R1, R2, R3)
 	* The result of `R1+R2` will be stored in `R3`
 
-ROT: "Rotate" 	(8-bits)
+ROT: "Rotate" 	(8-bits / 2-hex)
+	* `ROT <IN1: 4-bit register name> <P1: 4-bit number of bits to shift>`
 	* Rotates some bitstring leftwise. As the MSB falls off it wraps around to the LSB.
 	* Requires one register address (R1) as well as a 4-bit constant indicating number of bits to shift.
 	  * (Shifts greater than 0100 are redundant.)
 
-AND, OR, XOR: "Logical Operations",  (12-bits)
+AND, OR, XOR: "Logical Operations",  (12-bits / 3-hex)
+	* `<OP> <IN1: 4-bit register name> <IN2: 4-bit register name> <OUT1: 4-bit register name>`
 	* Produces the logical `(AND | OR | XOR)` of two bitstrings.
 	* Requires three register addresses: (R1, R2, R3)
 	* Stores the result of `R1 <op> R2` in `R3`
 
 ### Memory Operations (4 instructions)
 
-MLOAD: "Memory Cell Load" (12-bits)
+MLOAD: "Memory Cell Load" (12-bits / 3-hex)
+	* `MLOAD <OUT1: 4-bit register name> <IN1: 8-bit memory address>`
 	* Loads the value from a memory cell into a register.
 	* Requires one register address (R1) as well as an 8-bit constant representing a memory address.
 
-MSTOR: "Memory Cell Store" (12-bits)
+MSTOR: "Memory Cell Store" (12-bits / 3-hex)
+	* `MLOAD <IN1: 4-bit register name> <OUT1: 8-bit memory address>`
 	* Stores the value from a register into a memory cell
 	* Requires one regiser address as well as an 8-bit constant representing a memory address.
 
-RMOV: "Register Move" (8-bits)
+RMOV: "Register Move" (8-bits / 2-hex)
+	* `RMOV <IN1: 4-bit register name> <OUT1: 4-bit register name>`
 	* Moves a value from one register location to another.
 	* Requires one register address as well as a 4-bit constant representing a register address.
 
-RSET: "Register Set" (12-bits)
+RSET: "Register Set" (12-bits / 3-hex)
+	* `RSET <4-bit register name> <8-bit constant value>`
 	* Loads a constant value into a register location.
 	* Requires one register address (R0) as well as an 8-bit constant
 
 ### Programmability (2 instructions)
 
-JMPEQ: "Jump if equal" (12-bits)
+JMPEQ: "Jump if equal" (12-bits / 3-hex)
+	* `JMPEQ <4-bit register name> <8-bit memory address>`
 	* Requires one register address (R1) as well as one memory address (M1)
 	* R1 is compared to the first register (0x0), if the bitstrings are identical
 	 then the program counter is set to `M1`
 	* Otherwise the program counter remains unchanged
 
-HLT: "Halt Machine"
-	* Stops machine ...
-
+HLT: "Halt Machine" (0-hex)
+	* Saying 0xB000 hurts the machine's feelings; so it ceases further execution.
+	* The emulator will exit as soon as the CPU enters a halted state.
 
 ### Hello, World.
 
 This is a sample program designed to test the machine.
-  * The program loads two numbers: 12 (0b00001100) and 30 (0b00011110) into registers 4 (0x3) and 5 (0x4).
-  * Then the program performs a twos complement addition, storing the result in register 6 (0x5).
-  * The program then moves register 6 (0x5) to memory cell 1 (0x00)
-  * The program then loads memory cell 1 (0x00) to register 1 (0x0)
-  * The program then checks that register 6 is equal to register 1.
-  * If it is the program will store a 1 in register 2 (0x1)
-  * If it is not the program will store a 0 in register 2 (0x1)
-  * Then the program will halt.
+ 	[0x930C, 0x941E, 0x0345, 0x7540, 0x6040, 0xA510, 0x9200, 0xB000, 0x9201, 0xB000];
 
-This tests: arithmetic, register moves, memory moves, branching, and halting.
+	* Load register 0x3 with value 0x0C (12)
+	* Load register 0x4 with value 0x1E (30)
+	* Add register  0x3 to 0x4, store result in register 0x5.
+	* Move register 0x5 to memory cell 0x40
+	* Load memory cell 0x40 to register 0x0
+	* Compare register 0x5 to register  0x0
+		* If comparison succeeds; jump to memory cell 16 (0x9201; 0xB000)
+		* Otherwise continue from cell 12 (0x9200; 0xB000)
+		* Effetively store (0 or 1) in register 2 based on comparison.
+
+This tests: arithmetic, register sets,  memory moves, branching, and halting.
 
 ---
 
@@ -117,10 +176,6 @@ Emulator Notes
 
 * The current CPU and memory state will only be printed when the program halts.
 * Each emulator tick processes exactly one opcode.
-* Programs must be fed in using the following format: 
-  * 1 instruction per line, as hex in the format `0x_:`
-  * Each instruction followed by a space, and then the operands.
-  * Each operand separated by spaces.
-  * e.g: To add R1 and R2 to R16: `0x0: 0x0 0x1 0xF`
-	* Read as `ADDB (R1+R2) => (R16)`
-* Programs are read from STDIN.
+* Floating point addition is not implemened
+* Memory cells are displayed as twos complement numbers.
+
