@@ -79,6 +79,49 @@ impl P150Cpu {
 				Continue
 			},
 
+			0x3   => { // AND
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = h_nibble(self.ir as u8);
+				let rloc_o0 = l_nibble(self.ir as u8);
+
+				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
+				Continue
+			},
+
+			0x4   => { // OR
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = h_nibble(self.ir as u8);
+				let rloc_o0 = l_nibble(self.ir as u8);
+
+				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
+				Continue
+			},
+
+			0x5   => { // XOR
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = h_nibble(self.ir as u8);
+				let rloc_o0 = l_nibble(self.ir as u8);
+
+				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
+				Continue
+			},
+
+			0x6   => { // MLOAD
+				let rloc_o0 = l_nibble((self.ir >> 8) as u8);
+				let mloc_i0 = self.ir as u8;
+
+				self.reg[rloc_o0 as uint] = self.mem[mloc_i0 as uint];
+				Continue
+			},
+
+			0x7   => { // MSTOR
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let mloc_o0 = self.ir as u8;
+				
+				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
+				Continue
+			},
+
 			0x9   => { // RSET
 				let rloc = ((self.ir >> 8) as u8) & U4_LOW;  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
@@ -88,7 +131,7 @@ impl P150Cpu {
 			},
 
 			0xB   => { Halt },
-			_     => { debug!("read opcode: {}", op); Continue },
+			_     => { debug!("read unhandled opcode: {}", op); Halt },
 		}
 	}
 
@@ -106,22 +149,29 @@ impl P150Cpu {
 	}
 }
 
+/// Take the lower nibble of a byte
 fn l_nibble(byte: u8) -> u8 {
 	(byte & U4_LOW)
 }
 
+/// Take the upper nibble of a byte and shift it
+/// towards the least significant bits.
 fn h_nibble(byte: u8) -> u8 {
 	(byte & U4_HIGH) >> 4
 }
 
 fn main() {
 	let mut cpu = P150Cpu::new();
-	let program = [0x911E, 0x920C, 0x0123, 0xB000];
+	let program = [0x911E, 0x920C, 0x0123, 0x73F0, 0x61F0, 0x0123, 0x73F1, 0xB000];
 	cpu.init_mem(program);
 	
 	// 0x911E => 0x9 (rset), 0x1 (reg), 0x1E (val: 30)
 	// 0x920C => 0x9 (rset), 0x2 (reg), 0x0C (val: 12)
 	// 0x0123 => 0x0 (addb), 0x1 (in1), 0x2 (in2), 0x3 (out1)
+	// 0x73F0 => 0x7 (msto), 0x3 (reg), 0xF0 (mem)
+	// 0x61F0 => 0x7 (mlod), 0x1 (reg), 0xF0 (mem)
+	// 0x0123 => 0x0 (addb), 0x1 (in1), 0x2 (in2), 0x3 (out1)
+	// 0x73F1 => 0x7 (msto), 0x3 (reg), 0xF1 (mem)
 
 	loop {
 		match cpu.tick() {
