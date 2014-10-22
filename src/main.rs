@@ -103,8 +103,7 @@ impl P150Cpu {
 			0x2   => { // ROT
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let swidth  = hi_nibble(self.ir as u8);
-				let swidth = if swidth > 8 { swidth - 8 } else { swidth };
-				let swidth = swidth as uint;
+				let swidth = if swidth > 8 { swidth - 8 } else { swidth } as uint;
 
 				// LHS shifts <width> bits off the (left) end of the bitstring
 				// RHS shifts the bitstring to the right until only the bits which fell off remain.
@@ -295,11 +294,13 @@ fn test_shift() {
 	// checks that the program rotates a single nibble 4 places
 	// this should move a single hex digit from the lhs to the rhs.
 	//
+	// NOTE: shifting 12 bits (12 - 8) and 4 bits should be equivalent.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x90B0, 0x2040, 0xB000]);
+	cpu.init_mem([0x90B0, 0x91B0, 0x20C0, 0x2140, 0xB000]);
 	boot(&mut cpu);
 
-	assert_eq!(cpu.get_reg()[0x0], 0x0B)
+	assert_eq!(cpu.get_reg()[0x0], 0x0B);
+	assert_eq!(cpu.get_reg()[0x1], 0x0B);
 }
 
 #[cfg(test)]
