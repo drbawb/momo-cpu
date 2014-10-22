@@ -122,16 +122,33 @@ impl P150Cpu {
 				Continue
 			},
 
+			0x8   => { // RMOV
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_o0 = h_nibble(self.ir as u8);
+
+				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
+				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
+				Continue
+			},
+
 			0x9   => { // RSET
 				let rloc = ((self.ir >> 8) as u8) & U4_LOW;  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
+				
 				self.reg[rloc as uint] = rval;               // store value in register
+				Continue
+			},
 
+			0xA   => { // JMPEQ
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let next_ip = self.ir as u8;
+
+				if self.reg[rloc_i0 as uint] == self.reg[0] { self.ip = next_ip }
 				Continue
 			},
 
 			0xB   => { Halt },
-			_     => { debug!("read unhandled opcode: {}", op); Halt },
+			_     => { debug!("halt, cpu on fire: {}", op); Halt },
 		}
 	}
 
@@ -162,16 +179,8 @@ fn h_nibble(byte: u8) -> u8 {
 
 fn main() {
 	let mut cpu = P150Cpu::new();
-	let program = [0x911E, 0x920C, 0x0123, 0x73F0, 0x61F0, 0x0123, 0x73F1, 0xB000];
+	let program = [0x902A, 0x911E, 0x920C, 0x0123, 0x8310, 0xA106, 0xB000];
 	cpu.init_mem(program);
-	
-	// 0x911E => 0x9 (rset), 0x1 (reg), 0x1E (val: 30)
-	// 0x920C => 0x9 (rset), 0x2 (reg), 0x0C (val: 12)
-	// 0x0123 => 0x0 (addb), 0x1 (in1), 0x2 (in2), 0x3 (out1)
-	// 0x73F0 => 0x7 (msto), 0x3 (reg), 0xF0 (mem)
-	// 0x61F0 => 0x7 (mlod), 0x1 (reg), 0xF0 (mem)
-	// 0x0123 => 0x0 (addb), 0x1 (in1), 0x2 (in2), 0x3 (out1)
-	// 0x73F1 => 0x7 (msto), 0x3 (reg), 0xF1 (mem)
 
 	loop {
 		match cpu.tick() {
