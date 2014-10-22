@@ -76,43 +76,43 @@ impl P150Cpu {
 		let op = (self.ir >> 12) as u8;
 		match op {
 			0x0   => { // ADDB
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
-				let rloc_i1 = h_nibble(self.ir as u8);          // second input: upper nibble of second byte
-				let rloc_o0 = l_nibble(self.ir as u8);          // output: lower nibble of second byte
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
+				let rloc_i1 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
+				let rloc_o0 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] + self.reg[rloc_i1 as uint];
 				Continue
 			},
 
 			0x3   => { // AND
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = h_nibble(self.ir as u8);
-				let rloc_o0 = l_nibble(self.ir as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = hi_nibble(self.ir as u8);
+				let rloc_o0 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
 				Continue
 			},
 
 			0x4   => { // OR
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = h_nibble(self.ir as u8);
-				let rloc_o0 = l_nibble(self.ir as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = hi_nibble(self.ir as u8);
+				let rloc_o0 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
 				Continue
 			},
 
 			0x5   => { // XOR
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = h_nibble(self.ir as u8);
-				let rloc_o0 = l_nibble(self.ir as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i1 = hi_nibble(self.ir as u8);
+				let rloc_o0 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
 				Continue
 			},
 
 			0x6   => { // MLOAD
-				let rloc_o0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_i0 = self.ir as u8;
 
 				self.reg[rloc_o0 as uint] = self.mem[mloc_i0 as uint];
@@ -120,7 +120,7 @@ impl P150Cpu {
 			},
 
 			0x7   => { // MSTOR
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_o0 = self.ir as u8;
 
 				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
@@ -128,8 +128,8 @@ impl P150Cpu {
 			},
 
 			0x8   => { // RMOV
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
-				let rloc_o0 = h_nibble(self.ir as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_o0 = hi_nibble(self.ir as u8);
 
 				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
@@ -137,7 +137,7 @@ impl P150Cpu {
 			},
 
 			0x9   => { // RSET
-				let rloc = l_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
+				let rloc = lo_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
 
 				self.reg[rloc as uint] = rval;               // store value in register
@@ -145,7 +145,7 @@ impl P150Cpu {
 			},
 
 			0xA   => { // JMPEQ
-				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let next_ip = self.ir as u8;
 
 				if self.reg[rloc_i0 as uint] == self.reg[0] { self.ip = next_ip }
@@ -172,13 +172,13 @@ impl P150Cpu {
 }
 
 /// Take the lower nibble of a byte
-fn l_nibble(byte: u8) -> u8 {
+fn lo_nibble(byte: u8) -> u8 {
 	(byte & U4_LOW)
 }
 
 /// Take the upper nibble of a byte and shift it
 /// towards the least significant bits.
-fn h_nibble(byte: u8) -> u8 {
+fn hi_nibble(byte: u8) -> u8 {
 	(byte & U4_HIGH) >> 4
 }
 
