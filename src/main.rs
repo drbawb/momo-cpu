@@ -54,6 +54,14 @@ impl P150Cpu {
 			println!("{:01X}: {}", addr, cell)
 		}
 
+		println!("---")
+
+		debug!("Memory")
+		for (addr, cell) in self.mem.iter().enumerate() {
+			debug!("{:02X}: {}", addr, cell)
+		}
+	}
+
 	#[cfg(test)]
 	fn get_reg(&self) -> &[u8] {
 		self.reg
@@ -79,7 +87,7 @@ impl P150Cpu {
 	fn tick(&mut self) -> CpuState {
 		self.fetch();
 
-		// decode
+		// decode & execute
 		let op = (self.ir >> 12) as u8;
 		match op {
 			0x0   => { // ADDB
