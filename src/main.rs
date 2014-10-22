@@ -1,7 +1,8 @@
 #![feature(phase)]
 #[phase(plugin, link)] extern crate log;
 
-const U4_MASK: u8 = 0b00001111; // Takes the lower 4 bits of a byte. Useful for decoding & encoding nibbles.
+const U4_LOW:  u8 = 0b00001111;
+const U4_HIGH: u8 = 0b11110000;
 
 enum CpuState {
 	Continue,
@@ -56,6 +57,15 @@ impl P150Cpu {
 		// decode
 		let op = (self.ir >> 12) as u8;
 		match op {
+			0x0   => { // ADDB
+				let rloc_i0 = ((self.ir >> 8) as u8) & U4_LOW;   // first input: lower nibble of first byte
+				let rloc_i1 = ((self.ir as u8) & U4_HIGH) >> 4;  // second input: upper nibble of second byte
+				let rloc_o0 = (self.ir as u8) & U4_LOW;          // output: lower nibble of second byte
+
+				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] + self.reg[rloc_i1 as uint];
+				Continue
+			},
+
 			0x9   => { // RSET
 				let rloc = ((self.ir >> 8) as u8) & U4_MASK; // lower 4 bytes of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
@@ -84,9 +94,13 @@ impl P150Cpu {
 }
 
 fn main() {
-	let program = [0x911E, 0x920C, 0xB000];
 	let mut cpu = P150Cpu::new();
+	let program = [0x911E, 0x920C, 0x0123, 0xB000];
 	cpu.init_mem(program);
+	
+	// 0x911E => 0x9 (rset), 0x1 (reg), 0x1E (val: 30)
+	// 0x920C => 0x9 (rset), 0x2 (reg), 0x0C (val: 12)
+	// 0x0123 => 0x0 (addb), 0x1 (in1), 0x2 (in2), 0x3 (out1)
 
 	loop {
 		match cpu.tick() {
