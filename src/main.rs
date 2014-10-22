@@ -67,16 +67,14 @@ impl P150Cpu {
 			},
 
 			0x9   => { // RSET
-				let rloc = ((self.ir >> 8) as u8) & U4_MASK; // lower 4 bytes of first byte
+				let rloc = ((self.ir >> 8) as u8) & U4_LOW;  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
 				self.reg[rloc as uint] = rval;               // store value in register
 
 				Continue
 			},
 
-			0xB   => { // HALT
-				Halt 
-			},
+			0xB   => { Halt },
 			_     => { debug!("read opcode: {}", op); Continue },
 		}
 	}
