@@ -58,9 +58,9 @@ impl P150Cpu {
 		let op = (self.ir >> 12) as u8;
 		match op {
 			0x0   => { // ADDB
-				let rloc_i0 = ((self.ir >> 8) as u8) & U4_LOW;   // first input: lower nibble of first byte
-				let rloc_i1 = ((self.ir as u8) & U4_HIGH) >> 4;  // second input: upper nibble of second byte
-				let rloc_o0 = (self.ir as u8) & U4_LOW;          // output: lower nibble of second byte
+				let rloc_i0 = l_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
+				let rloc_i1 = h_nibble(self.ir as u8);          // second input: upper nibble of second byte
+				let rloc_o0 = l_nibble(self.ir as u8);          // output: lower nibble of second byte
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] + self.reg[rloc_i1 as uint];
 				Continue
@@ -89,6 +89,14 @@ impl P150Cpu {
 		
 		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
 	}
+}
+
+fn l_nibble(byte: u8) -> u8 {
+	(byte & U4_LOW)
+}
+
+fn h_nibble(byte: u8) -> u8 {
+	(byte & U4_HIGH) >> 4
 }
 
 fn main() {
