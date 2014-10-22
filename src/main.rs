@@ -99,6 +99,22 @@ impl P150Cpu {
 				Continue
 			},
 
+			0x2   => { // ROT
+				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
+				let swidth  = hi_nibble(self.ir as u8);
+				let swidth = if swidth > 8 { swidth - 8 } else { swidth };
+				let swidth = swidth as uint;
+
+				// LHS shifts <width> bits off the (left) end of the bitstring
+				// RHS shifts the bitstring to the right until only the bits which fell off remain.
+				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
+				//   ∴ LHS <OR> RHS provides a rotated bitstring
+				let x = self.reg[rloc_i0 as uint];
+				self.reg[rloc_i0 as uint] = (x << swidth) | (x >> (8 - swidth));
+
+				Continue
+			},
+
 			0x3   => { // AND
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let rloc_i1 = hi_nibble(self.ir as u8);
@@ -283,5 +299,17 @@ fn test_branch() {
 	}
 
 	assert_eq!(cpu.get_reg()[0x2], 0x2A)
+}
+
+#[test]
+fn test_shift() {
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x90B0, 0x2040, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert_eq!(cpu.get_reg()[0x0], 0x0B)
 }
 
