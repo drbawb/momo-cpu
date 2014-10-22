@@ -9,6 +9,7 @@ enum CpuState {
 	Halt,
 }
 
+/// The P150 virtual machine
 struct P150Cpu {
 	ip:  u8,
 	ir: u16,
@@ -18,6 +19,12 @@ struct P150Cpu {
 }
 
 impl P150Cpu {
+	/// Initializes the P150 CPU
+	///
+	/// NOTE: This implementation 0s memory; but this is not guaranteed 
+	/// by the machine specification.
+	///
+	/// Programs must start at memory address 0x00
 	fn new() -> P150Cpu {
 		P150Cpu {
 			ip:  0x00,
@@ -28,6 +35,9 @@ impl P150Cpu {
 		}
 	}
 
+	/// Prints the current machine state to the console window
+	/// This includes the IP, IR, and all registers.
+	/// (Registers will be formatted as 2s complement numbers.)
 	fn dump(&self) {
 		println!("IP: 0x{:02X}, IR: 0x{:04X}", self.ip, self.ir);
 
@@ -37,7 +47,9 @@ impl P150Cpu {
 		}
 	}
 
-	// Read an array of instructions into memory
+	/// Read an array of instructions into memory
+	/// This reads two bytes at a time from the `memory` array
+	/// and loads them into the P150s RAM bank, starting from address 0.
 	fn init_mem(&mut self, memory: &[u16]) {
 		let mut next_cell = 0x00;
 
@@ -51,6 +63,7 @@ impl P150Cpu {
 		}
 	}
 
+	/// Runs the entire fetch, execute, decode cycle against the current IP
 	fn tick(&mut self) -> CpuState {
 		self.fetch();
 
@@ -79,6 +92,8 @@ impl P150Cpu {
 		}
 	}
 
+	/// Load the instruction at `IP` and advance the pointer by two bytes.
+	/// The instruction is packed into a single `u16` and stored in the instruction register.
 	fn fetch(&mut self) {
 		// load PC -> IR
 		let byte_1 = self.mem[(self.ip+0) as uint];
