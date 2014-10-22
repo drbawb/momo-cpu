@@ -4,6 +4,7 @@
 const U4_LOW:  u8 = 0b00001111;
 const U4_HIGH: u8 = 0b11110000;
 
+#[deriving(PartialEq,Show)]
 enum CpuState {
 	Continue,
 	Halt,
@@ -45,6 +46,10 @@ impl P150Cpu {
 		for (addr, cell) in self.reg.iter().enumerate() {
 			println!("{}: {}", addr, cell)
 		}
+
+	#[cfg(test)]
+	fn get_reg(&self) -> &[u8] {
+		self.reg
 	}
 
 	/// Read an array of instructions into memory
@@ -188,5 +193,80 @@ fn main() {
 			Halt => { println!("CPU halted."); cpu.dump(); break; },
 		}
 	}
+}
+
+#[test]
+fn test_hammer_time() {
+	// cpu should stop
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0xB000]);
+
+	assert_eq!(cpu.tick(), Halt)
+}
+
+#[test]
+fn test_registers() {
+	// cpu should set, move registers accordingly
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x9110, 0x8130, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert_eq!(cpu.get_reg()[0x3], 16)
+}
+
+#[test]
+fn test_memory() {
+	// memory sets and memory stores should read back successfully
+	// uninitialized registers should not match initialized registers
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x9120, 0x9330, 0x7140, 0x6240, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
+	assert!(cpu.get_reg()[0x1] != cpu.get_reg()[0x3]);
+}
+
+#[test]
+fn test_bin() {
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x9121, 0x9222, 0x3123, 0x4124, 0x5125, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert!(cpu.get_reg()[0x3] == (0x21 & 0x22));
+	assert!(cpu.get_reg()[0x4] == (0x21 | 0x22));
+	assert!(cpu.get_reg()[0x5] == (0x21 ^ 0x22));
+}
+
+#[test]
+fn test_math() {
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x9120, 0x920A, 0x0123, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2])
+}
+
+#[test]
+fn test_branch() {
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x9021, 0x9121, 0xA108, 0xB000, 0x922A, 0xB000]);
+
+	loop {
+		if cpu.tick() == Halt { break; }
+	}
+
+	assert_eq!(cpu.get_reg()[0x2], 0x2A)
 }
 
