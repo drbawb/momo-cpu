@@ -1,9 +1,14 @@
 #![feature(phase)]
 #[phase(plugin, link)] extern crate log;
 
+// masks for pulling nibbles out of bytes
 const U4_LOW:  u8 = 0b00001111;
 const U4_HIGH: u8 = 0b11110000;
 
+
+/// If the CPU enters the `Halt` state then any additional ticks will result in
+/// the program exhibiting undefined behavior.
+///
 #[deriving(PartialEq,Show)]
 enum CpuState {
 	Continue,
@@ -11,6 +16,8 @@ enum CpuState {
 }
 
 /// The P150 virtual machine
+/// Represents all information the CPU needs to continue executing a
+/// program stored in its main memory.
 struct P150Cpu {
 	ip:  u8,
 	ir: u16,
@@ -25,7 +32,7 @@ impl P150Cpu {
 	/// NOTE: This implementation 0s memory; but this is not guaranteed
 	/// by the machine specification.
 	///
-	/// Programs must start at memory address 0x00
+	/// Programs MUST start at memory address 0x00
 	fn new() -> P150Cpu {
 		P150Cpu {
 			ip:  0x00,
