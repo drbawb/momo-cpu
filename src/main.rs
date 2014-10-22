@@ -21,7 +21,7 @@ struct P150Cpu {
 impl P150Cpu {
 	/// Initializes the P150 CPU
 	///
-	/// NOTE: This implementation 0s memory; but this is not guaranteed 
+	/// NOTE: This implementation 0s memory; but this is not guaranteed
 	/// by the machine specification.
 	///
 	/// Programs must start at memory address 0x00
@@ -117,7 +117,7 @@ impl P150Cpu {
 			0x7   => { // MSTOR
 				let rloc_i0 = l_nibble((self.ir >> 8) as u8);
 				let mloc_o0 = self.ir as u8;
-				
+
 				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
 				Continue
 			},
@@ -134,7 +134,7 @@ impl P150Cpu {
 			0x9   => { // RSET
 				let rloc = ((self.ir >> 8) as u8) & U4_LOW;  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
-				
+
 				self.reg[rloc as uint] = rval;               // store value in register
 				Continue
 			},
@@ -158,10 +158,10 @@ impl P150Cpu {
 		// load PC -> IR
 		let byte_1 = self.mem[(self.ip+0) as uint];
 		let byte_2 = self.mem[(self.ip+1) as uint];
-		
+
 		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16);
 		self.ip += 2;
-		
+
 		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
 	}
 }
