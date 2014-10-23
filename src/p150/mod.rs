@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use serialize::json;
+use serialize::json::{ToJson};
+
 // masks for pulling nibbles out of bytes
 const BYTE_WIDTH: uint = 8;
 const U4_LOW:     u8   = 0b00001111;
@@ -39,6 +43,17 @@ impl P150Cpu {
 			reg: [0u8, ..16],
 			mem: [0u8, ..256],
 		}
+	}
+
+	pub fn js_dump(&self) -> json::Json {
+		let mut dict = HashMap::new();
+		
+		dict.insert(format!("ip"), self.ip.to_json());
+		dict.insert(format!("ir"), self.ir.to_json());
+		dict.insert(format!("reg"), self.reg.to_json());
+		dict.insert(format!("mem"), self.mem.to_json());
+
+		return dict.to_json();
 	}
 
 	/// Prints the current machine state to the console window

@@ -6,6 +6,7 @@ extern crate serialize;
 
 use p150::P150Cpu;
 
+use serialize::json;
 use std::collections::HashMap;
 use std::io::net::ip::Ipv4Addr;
 use std::sync::{Arc,RWLock};
@@ -58,14 +59,53 @@ fn main() {
 				w_cpuserv.database.insert(cpu_no, P150Cpu::new());
 				w_cpuserv.next_cpu += 1;
 
-				response.send(format!("your cpu is # {}", w_cpuserv.next_cpu));
+				response.send(json::encode(&cpu_no));
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
+	}
+
+	fn cpu_load(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let mut w_serv = cpuserv.write();
+				let cpu        = w_serv.database.find_mut(&id).unwrap();
+
+				cpu.init_mem([0x1001, 0xB000]); // TODO: load from req.
+				response.send(format!("{}", cpu.js_dump()));
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
+	}
+
+	fn cpu_run(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let mut cycles = 0i16;
+				let mut w_serv = cpuserv.write();
+				let cpu    = w_serv.database.find_mut(&id).unwrap();
+				loop {
+					if cycles == 10000 { println!("CPU executed > 10000 cycles."); break; }
+					cycles += 1;
+
+					match cpu.tick() {
+						p150::Halt => { break; },
+						p150::Continue => { continue; },
+					}
+				}
+
+				response.send(format!("{}", cpu.js_dump()));
 			},
 			None => { response.send("did not find cpu serv"); }
 		}
 	}
 
 	router.get("/", index_show);
-	router.get("/cpu/new", cpu_new);
+	router.post("/cpu/new", cpu_new);
+	router.post("/cpu/:id/load", cpu_load);
+	router.post("/cpu/:id/run", cpu_run);
 
 	server.utilize(CpuMw { db: Arc::new(RWLock::new(CpuServ::new())) });
 	server.utilize(StaticFilesHandler::new("./public"));
