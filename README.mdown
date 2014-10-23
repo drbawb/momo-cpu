@@ -46,16 +46,16 @@ Thus each instruction is (up to) 16-bits wide.
 
 OPCODE  | INSTRUCTION
 --------|------------
-0x0     |  ADDB
-0x1     |  ADDF
-0x2     |   ROT
-0x3     |   AND
-0x4     |    OR
-0x5     |   XOR
-0x6     | MLOAD
-0x7     | MSTOR
-0x8     |  RMOV
-0x9     |  RSET
+0x0     | MLOAD
+0x1     |  RSET
+0x2     | MSTOR
+0x3     |  RMOV
+0x4     |  ADDB
+0x5     |  ADDF
+0x6     |    OR
+0x7     |   AND
+0x8     |   XOR
+0x9     |   ROT
 0xA     | JMPEQ
 0xB     |   HLT
 0xC-0xF | RESERVED
