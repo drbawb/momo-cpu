@@ -1,0 +1,63 @@
+<!doctype HTML>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+		<script src="js/bootstrap.js"></script>
+		<link href="css/bootstrap.css" rel="stylesheet" />
+		
+		<title>{{title}}</title>
+	</head>
+
+	<body>
+		<div class="container">
+			<div class="page-header">
+				<h1>PANTHER150 Machine Emulator</h1>
+				<p class="lead">
+					The little CPU that could ...
+				</p>
+			</div>
+
+			<div class="row">
+				<div class="col-md-8">
+					main screen turn on
+				</div>
+
+				<div class="col-md-3 .col-md-offset-1 panel panel-default">
+					<h3>Welcome!</h3>
+					<p>
+						This is a web-frontend to a P150 emulator.
+						The P150 machine supports:
+						<ul>
+							<li>256-bytes of memory</li>
+							<li>16-bytes of registers</li>
+							<li>2-byte instructions</li>
+							<li>Up to 16 different opcodes</li>
+						</ul>
+					</p>
+
+					<p>The CPU supports two modes of operation: step-by-step, and program execute.</p>
+					<p>
+						Begin by loading your program into the memory cells on the right side of the screen.
+						(The CPU will always begin execution at address <code>0x00</code>.)
+					</p>
+
+					<p>
+						When you are ready: click the `run program` button.
+						The server will attempt to run your program and display the results.
+					</p>
+
+					<p class="alert alert-warning">
+						The CPU server will only run up to 10,000 instructions.
+						<br /><br />
+						The CPU will be forcibly halted at this point; and the current
+						state of the CPU at the last executed instruction will be returned.
+					</p>
+				</div>
+
+			</div>
+		</div>
+	</body>
+</html>
