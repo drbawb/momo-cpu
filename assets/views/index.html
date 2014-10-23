@@ -6,6 +6,11 @@
 
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 		<script src="js/bootstrap.js"></script>
+		<script type="text/javascript">
+			$(document).ready(function() {
+				console.log("Initializing P150 JS Client ...");
+			});
+		</script>
 		<link href="css/bootstrap.css" rel="stylesheet" />
 		
 		<title>{{title}}</title>
@@ -22,8 +27,8 @@
 
 			<div class="row">
 				<div class="col-md-8">
-					main screen turn on
-				</div>
+					Fetching a new CPU, please wait :-) ...
+				</div> <!-- end main panel -->
 
 				<div class="col-md-3 .col-md-offset-1 panel panel-default">
 					<h3>Welcome!</h3>
@@ -55,7 +60,7 @@
 						The CPU will be forcibly halted at this point; and the current
 						state of the CPU at the last executed instruction will be returned.
 					</p>
-				</div>
+				</div> <!-- end sidebar well -->
 
 			</div>
 		</div>
