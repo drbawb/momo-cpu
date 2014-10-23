@@ -64,16 +64,17 @@ impl P150Cpu {
 	}
 
 	#[cfg(test)]
-	fn get_reg(&self) -> &[u8] {
-		self.reg
-	}
+	fn get_reg(&self) -> &[u8] { self.reg }
 
 	/// Read an array of instructions into main memory
 	/// This reads two bytes at a time from the `memory` array
 	/// and loads them into the P150s RAM bank, starting from address 0.
 	fn init_mem(&mut self, memory: &[u16]) {
+		assert!(memory.len() < (256 / 2)); // program cannot be larger than memory
 		let mut next_cell = 0x00;
 
+		// zero memory
+		self.mem = [0, ..256];
 		for op in memory.iter() {
 			let byte_1 = (*op >> 8) as u8;
 			let byte_2 = *op as u8;
@@ -101,16 +102,14 @@ impl P150Cpu {
 			},
 
 			0x2   => { // ROT
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let swidth  = hi_nibble(self.ir as u8);
-				let swidth = if swidth > 8 { swidth - 8 } else { swidth } as uint;
-
 				// LHS shifts <width> bits off the (left) end of the bitstring
 				// RHS shifts the bitstring to the right until only the bits which fell off remain.
 				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
 				//   ∴ LHS <OR> RHS provides a rotated bitstring
-				let x = self.reg[rloc_i0 as uint];
-				self.reg[rloc_i0 as uint] = (x << swidth) | (x >> (BYTE_WIDTH - swidth));
+				//
+				let rloc_i0   = lo_nibble((self.ir >> 8) as u8) as uint;          // register is first nibble ...
+				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as uint; // last three bytes of second nibble ...
+				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] << swidth) | (self.reg[rloc_i0] >> (BYTE_WIDTH - swidth));
 
 				Continue
 			},
@@ -191,12 +190,12 @@ impl P150Cpu {
 	/// Load the instruction at `IP` and advance the pointer by two bytes.
 	/// The instruction is packed into a single `u16` and stored in the instruction register.
 	fn fetch(&mut self) {
-		// load PC -> IR
+		// fetch two bytes from PC
 		let byte_1 = self.mem[(self.ip+0) as uint];
 		let byte_2 = self.mem[(self.ip+1) as uint];
 
-		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16);
-		self.ip += 2;
+		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16); // load byets into IR
+		self.ip += 2;                                      // increment instruction pointer
 
 		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
 	}
@@ -216,8 +215,9 @@ fn hi_nibble(byte: u8) -> u8 {
 fn main() {
 	let mut cpu = P150Cpu::new();
 	let program = [0x911E, 0x920C, 0x0123, 0x7340, 0x6040, 0xA310, 0x9500, 0xB000, 0x9501, 0xB000];
+	//            [0x00    0x02    0x04    0x06    0x08    0x0A    0x0C    0x0E    0x10    0x12  ]
+	
 	cpu.init_mem(program);
-
 	loop {
 		match cpu.tick() {
 			Continue => { continue; },
