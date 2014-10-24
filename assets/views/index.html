@@ -5,13 +5,96 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min.js"></script>
 		<script src="js/bootstrap.js"></script>
+
 		<script type="text/javascript">
 			$(document).ready(function() {
 				console.log("Initializing P150 JS Client ...");
+
+				// initialize some of our views
+				var cpuState = {
+					ir: 0,
+					ip: 0,
+					mem: new Uint8Array(256),
+					reg: new Uint8Array(16)
+				};
+
+				// formats `reg` into a matrix of 1x16 cells
+				var viewReg = function(inArr) {
+					var table = { head: ['ADDR', 'VAL'], body: [] };
+					for (var row = 0; row < 16; row++) {
+						table.body.push([fmtHex(row), fmtHex(inArr[row])]);
+					};
+					
+					return table;
+				};
+
+				// formats `mem` into a matrix of 16x16 cells
+				var viewMem = function(inArr) {
+					var table  = { head: ['ROW'], body: [] };
+					
+					// print header row
+					for (var col = 0; col < 16; col++) {
+						table.head.push(col.toString(16));
+					}
+
+					for (var row = 0; row < 16; row++) {
+						var memRow = {rowIdx: row.toString(16), cells: []};
+						var offset = row * 16;
+						for (var col = 0; col < 16; col++) {
+							memRow.cells.push(fmtHex(inArr[offset + col]));
+						}
+
+						table.body.push(memRow);
+					}
+
+					return table;
+				};
+
+				var fmtHex = function(num) {
+					return ("00" + num.toString(16)).substr(-2);
+				};
+
+				var tCpuSrc = $('#cpu-template').html();
+				var tCpu = Handlebars.compile(tCpuSrc);
+
+				var tRegSrc = $('#register-template').html();
+				var tReg = Handlebars.compile(tRegSrc);
+
+				var tMemSrc = $('#memory-template').html();
+				var tMem = Handlebars.compile(tMemSrc);
+
+				loadCpu = function(cpuState) {
+					$('#cpu-core').html(tCpu(cpuState));
+					$('#cpu-box').html(tReg(viewReg(cpuState.reg)));
+					$('#cpu-box').append(tMem(viewMem(cpuState.mem)));
+				};
+
+				//init-machine, run-machine
+				var initCpu = function() {
+					return $.post('/cpu/new');
+				};
+
+				var loadProg = function(data, txtStatus, jqXHR) {
+					return $.post('/cpu/' + data + '/load', function(data) {
+						loadCpu(JSON.parse(data));
+
+						$('#init-machine').on('click', function(evt) {
+							console.log('loading memory ...');
+						});
+
+						$('#run-machine').on('click', function(evt) {
+							console.log('running program ...');
+						});
+					});
+				};
+
+				initCpu().then(loadProg);
 			});
 		</script>
 		<link href="css/bootstrap.css" rel="stylesheet" />
+		<link href="css/main.css" rel="stylesheet" />
 		
 		<title>{{title}}</title>
 	</head>
@@ -27,7 +110,10 @@
 
 			<div class="row">
 				<div class="col-md-8">
-					Fetching a new CPU, please wait :-) ...
+					<div id="cpu-core" class="row col-md-12"></div>
+					<div id="cpu-box" class="row col-md-12">
+						Fetching a new CPU, please wait :-) ...
+					</div>
 				</div> <!-- end main panel -->
 
 				<div class="col-md-3 .col-md-offset-1 panel panel-default">
@@ -64,5 +150,86 @@
 
 			</div>
 		</div>
+
+		{{=<% %>=}}
+
+		<script id="cpu-template" type="text/x-handlebars-template">
+		<div class="col-sm-3 col-md-3">
+			<h3>CPU State</h3>
+			<table class="memory table table-bordered">
+				<thead>
+					<th>REG</th>
+					<th>VAL</th>
+				</thead>
+				<tbody>
+					<tr>
+						<td>IP</td>
+						<td>{{ip}}</td>
+					</tr>
+					<tr>
+						<td>IR</td>
+						<td>{{ir}}</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="col-sm-8 col-sm-offset-1">
+			<div class="row panel panel-default col-md-12">
+			Coming soon: instruction trace viewer
+			</div>
+			<div class="row panel panel-default col-md-12">
+				<input id="init-machine" type="button" value="Load" />
+				<input id="run-machine" type="button" value="Run" />
+			</div>
+		</div>
+		</script>
+
+		<script id="register-template" type="text/x-handlebars-template">
+		<div class="col-sm-2 col-md-2">
+		<h3> Registers </h3>
+		<table class="memory table table-bordered">
+			<thead>
+				{{#each head}}
+					<th>{{this}}</th>
+				{{/each}}
+			</thead>
+			<tbody>
+				{{#each body}}
+					<tr>
+						{{#each this}}
+							<td>{{this}}</td>
+						{{/each}}
+					</tr>
+				{{/each}}
+			</tbody>
+		</table>
+		</div>
+		</script>
+
+		<script id="memory-template" type="text/x-handlebars-template">
+		<div class="col-sm-10 col-md-8 col-md-offset-1">
+		<h3> Memory Bank #1 </h3>
+		<table class="memory table table-bordered">
+			<thead>
+				{{#each head}}
+					<th>{{this}}</th>
+				{{/each}}
+			</thead>
+			<tbody>
+				{{#each body}}
+					<tr>
+						<td> {{this.rowIdx}} </td>
+						{{#each this.cells}}
+							<td>
+								<input type="textbox" value="{{this}}" size="2" />
+							</td>
+						{{/each}}
+					</tr>
+				{{/each}}
+			</tbody>
+		</table>
+		</div>
+		</script>
+		<%={{ }}=%>
 	</body>
 </html>
