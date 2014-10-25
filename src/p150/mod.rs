@@ -142,7 +142,8 @@ impl P150Cpu {
 				let rloc_i1 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
 				let rloc_o0 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
 
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] + self.reg[rloc_i1 as uint];
+				self.reg[rloc_o0 as uint] = 
+					((self.reg[rloc_i0 as uint] as i8) + (self.reg[rloc_i1 as uint]as i8)) as u8;
 				Continue
 			},
 
