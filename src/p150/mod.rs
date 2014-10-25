@@ -56,25 +56,6 @@ impl P150Cpu {
 		return dict.to_json();
 	}
 
-	/// Prints the current machine state to the console window
-	/// This includes the IP, IR, and all registers.
-	/// (Registers will be formatted as 2s complement numbers.)
-	pub fn dump(&self) {
-		println!("IP: 0x{:02X}, IR: 0x{:04X}", self.ip, self.ir);
-
-		println!("---\nRegisters\n---")
-		for (addr, cell) in self.reg.iter().enumerate() {
-			println!("{:01X}: {}", addr, cell)
-		}
-
-		println!("---")
-
-		debug!("Memory")
-		for (addr, cell) in self.mem.iter().enumerate() {
-			debug!("{:02X}: {}", addr, cell)
-		}
-	}
-
 	#[cfg(test)]
 	fn get_reg(&self) -> &[u8] { self.reg }
 
