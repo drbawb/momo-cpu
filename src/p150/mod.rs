@@ -82,10 +82,12 @@ impl P150Cpu {
 	/// This reads two bytes at a time from the `memory` array
 	/// and loads them into the P150s RAM bank, starting from address 0.
 	pub fn init_mem(&mut self, memory: &[u16]) {
-		assert!(memory.len() < (256 / 2)); // program cannot be larger than memory
+		assert!(memory.len() <= (256 / 2)); // program cannot be larger than memory
 		let mut next_cell = 0x00;
 
 		// zero memory
+		self.ip  = 0;
+		self.ir  = 0;
 		self.mem = [0, ..256];
 		for op in memory.iter() {
 			let byte_1 = (*op >> 8) as u8;
