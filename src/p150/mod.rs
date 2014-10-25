@@ -165,7 +165,7 @@ impl P150Cpu {
 				//
 				let rloc_i0   = lo_nibble((self.ir >> 8) as u8) as uint;          // register is first nibble ...
 				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as uint; // last three bytes of second nibble ...
-				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] << swidth) | (self.reg[rloc_i0] >> (BYTE_WIDTH - swidth));
+				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] >> swidth) | (self.reg[rloc_i0] << (BYTE_WIDTH - swidth));
 
 				Continue
 			},
@@ -284,6 +284,37 @@ fn test_shift() {
 
 	assert_eq!(cpu.get_reg()[0x0], 0x0B);
 	assert_eq!(cpu.get_reg()[0x1], 0x0B);
+}
+
+#[test]
+fn test_shift_right() {
+	// checks that the program rotates a single nibble 3 places.
+	// this arbitrary shift tests the directionality of the shift; 
+	//   which should be TO THE RIGHT.
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x100C, 0x9030, 0xB000]);
+	boot(&mut cpu);
+
+	// 0b0000_1100 3-> == 0b1000_0001
+	// 0x0C               0x81
+	assert_eq!(cpu.get_reg()[0x0], 0x81);
+}
+
+#[test]
+#[should_fail]
+fn test_shift_left() {
+	// checks that the program rotates a single nibble 3 places.
+	// this arbitrary shift tests the directionality of the shift; 
+	//   this is the CONVERSE to the test above.
+	//
+
+	let mut cpu = P150Cpu::new();
+	cpu.init_mem([0x100C, 0x9030, 0xB000]);
+	boot(&mut cpu);
+
+	// 0b0000_1100 <-3 == 0b0110_0000
+	// 0x0C               0x60
+	assert_eq!(cpu.get_reg()[0x0], 0x60);
 }
 
 #[cfg(test)]
