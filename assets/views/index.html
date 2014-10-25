@@ -13,6 +13,7 @@
 				console.log("Initializing P150 JS Client ...");
 
 				// initialize some of our views
+				var cpuId = -1;
 				var cpuState = {
 					ir: 0,
 					ip: 0,
@@ -56,6 +57,10 @@
 					return ("00" + num.toString(16)).substr(-2);
 				};
 
+				Handlebars.registerHelper('fmtHex', function(num) {
+					return ("0000" + num.toString(16)).substr(-4);
+		  		});
+
 				var tCpuSrc = $('#cpu-template').html();
 				var tCpu = Handlebars.compile(tCpuSrc);
 
@@ -73,27 +78,68 @@
 
 				//init-machine, run-machine
 				var initCpu = function() {
-					return $.post('/cpu/new');
+					return $.post('/cpu/new', function(data) {
+						cpuId = JSON.parse(data);
+					});
 				};
 
-				var loadProg = function(data, txtStatus, jqXHR) {
-					return $.post('/cpu/' + data + '/load', function(data) {
-						loadCpu(JSON.parse(data));
-
+				var dumpCpu = function(data, txtStatus, jqXHR) {
+					return $.get('/cpu/' + cpuId + '/dump', function(data) {
+		 				// parse and load cpu state
+						console.log('dumping cpu ...');
+						
+						cpuState = JSON.parse(data);
+						loadCpu(cpuState);
+						
 						$('#init-machine').on('click', function(evt) {
-							console.log('loading memory ...');
+							loadMem().then(dumpCpu);
+						});
+
+						$('#tick-machine').on('click', function(evt) {
+							tickMem().then(dumpCpu);
 						});
 
 						$('#run-machine').on('click', function(evt) {
-							console.log('running program ...');
+							runMem().then(dumpCpu);
 						});
 					});
 				};
 
-				initCpu().then(loadProg);
+				var loadMem = function() {
+					var memArr = [];
+					$('#cpu-mem tr').each(function(rIdx, row) {
+						if (rIdx == 0) { return; }
+						var offset = (rIdx - 1) * 16;
+						var tableCells = $(this).find('td input');
+						tableCells.each(function(cIdx, row) {
+							memArr[offset + cIdx] = $(this).val();
+						});
+					});
+
+					console.log(memArr);
+					
+					console.log("calling ajax");
+					return $.post('/cpu/' + cpuId + '/load', JSON.stringify(memArr), function(data) {
+						console.log("cpu load: GREAT SUCCESS ^^,");
+					});
+				};
+
+				var tickMem = function() {
+					return $.post('/cpu/' + cpuId + '/tick', function(data) {
+						console.log("cpu ran successfully, loading ...");
+					});
+				};
+				var runMem = function() {
+					return $.post('/cpu/' + cpuId + '/run', function(data) {
+						console.log("cpu ran successfully, loading ...");
+					});
+				};
+
+				initCpu().then(dumpCpu);
 			});
 		</script>
 		<link href="css/bootstrap.css" rel="stylesheet" />
+		<link href="css/bootstrap-theme.css" rel="stylesheet" />
 		<link href="css/main.css" rel="stylesheet" />
 		
 		<title>{{title}}</title>
@@ -106,6 +152,11 @@
 				<p class="lead">
 					The little CPU that could ...
 				</p>
+
+				<ul class="nav nav-pills">
+					<li><a href="/">Emulator</a></li>
+					<li><a href="/about">About</a></li>
+				</ul>
 			</div>
 
 			<div class="row">
@@ -136,8 +187,22 @@
 					</p>
 
 					<p>
-						When you are ready: click the `run program` button.
-						The server will attempt to run your program and display the results.
+						<ul>
+							<li>
+							Enter your program into the memory cells. Each cell takes two hexadecimal digits.
+							</li>
+							<li>
+							Click the `Load` button to store your program in your CPU and reset the program
+							counter to zero.
+							</li>
+							<li>
+							Click the `Run` button to run the program.
+							</li>
+							<li>
+							The server will attempt to run your program and display the results
+							</li>
+						</ul>
+
 					</p>
 
 					<p class="alert alert-warning">
@@ -147,7 +212,11 @@
 						state of the CPU at the last executed instruction will be returned.
 					</p>
 				</div> <!-- end sidebar well -->
-
+			</div>
+			<div class="footer">
+				<div class="container">
+					<p class="text-muted"> &copy; 2014 Robbie Straw, All Rights Reserved. </p>
+				</div>
 			</div>
 		</div>
 
@@ -156,7 +225,7 @@
 		<script id="cpu-template" type="text/x-handlebars-template">
 		<div class="col-sm-3 col-md-3">
 			<h3>CPU State</h3>
-			<table class="memory table table-bordered">
+			<table id="cpu-core" class="memory table table-bordered">
 				<thead>
 					<th>REG</th>
 					<th>VAL</th>
@@ -164,11 +233,11 @@
 				<tbody>
 					<tr>
 						<td>IP</td>
-						<td>{{ip}}</td>
+						<td>{{fmtHex ip}}</td>
 					</tr>
 					<tr>
 						<td>IR</td>
-						<td>{{ir}}</td>
+						<td>{{fmtHex ir}}</td>
 					</tr>
 				</tbody>
 			</table>
@@ -177,9 +246,10 @@
 			<div class="row panel panel-default col-md-12">
 			Coming soon: instruction trace viewer
 			</div>
-			<div class="row panel panel-default col-md-12">
-				<input id="init-machine" type="button" value="Load" />
-				<input id="run-machine" type="button" value="Run" />
+			<div class="row col-md-12">
+				<input id="init-machine" class="btn btn-primary" type="button" value="Load" />
+				<input id="run-machine"  class="btn btn-primary" type="button" value="Run" />
+				<input id="tick-machine"  class="btn btn-primary" type="button" value="Step" >
 			</div>
 		</div>
 		</script>
@@ -187,7 +257,7 @@
 		<script id="register-template" type="text/x-handlebars-template">
 		<div class="col-sm-2 col-md-2">
 		<h3> Registers </h3>
-		<table class="memory table table-bordered">
+		<table id="cpu-reg" class="memory table table-bordered">
 			<thead>
 				{{#each head}}
 					<th>{{this}}</th>
@@ -209,7 +279,7 @@
 		<script id="memory-template" type="text/x-handlebars-template">
 		<div class="col-sm-10 col-md-8 col-md-offset-1">
 		<h3> Memory Bank #1 </h3>
-		<table class="memory table table-bordered">
+		<table id="cpu-mem" class="memory table table-bordered">
 			<thead>
 				{{#each head}}
 					<th>{{this}}</th>

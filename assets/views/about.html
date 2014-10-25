@@ -1,0 +1,71 @@
+<!doctype HTML>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<script src="js/bootstrap.js"></script>
+		
+		<link href="css/bootstrap.css" rel="stylesheet" />
+		<link href="css/bootstrap-theme.css" rel="stylesheet" />
+		<link href="css/main.css" rel="stylesheet" />
+		
+		<title>{{title}}</title>
+	</head>
+
+	<body>
+		<div class="container">
+			<div class="page-header">
+				<h1>PANTHER150 Machine Emulator</h1>
+				<p class="lead">
+					The little CPU that could ...
+				</p>
+
+				<ul class="nav nav-pills">
+					<li><a href="/">Emulator</a></li>
+					<li><a href="/about">About</a></li>
+				</ul>
+			</div>
+
+			<div class="row">
+<p>
+The <strong>PANTHER150</strong> emulator is written in the <a href="http://rust-lang.org">Rust</a> 
+programming language. The machine is laid out as:
+<ul>
+	<li>A single byte for the instruction pointer</li>
+	<li>Two bytes for the current instruction</li>
+	<li>An array of 16 bytes for the CPU registers.</li>
+	<li>An array of 256 bytes for the system memory.</li>
+</ul>
+</p>
+
+<p>
+The CPU has a fetch, decode, execute cycle which decides to enter one of two states.
+The CPU can either continue with the <em>Running</em> state or it can enter the <em>Halted</em> state.
+The CPU will Halt if it encounters instruction 12 (<code>0xB000</code>) <em>or</em> if the CPU panics.
+
+The CPU might panic, for instance, if you were to use the unimplemented floating point arithmetic: or an
+undefined instruction.
+</p>
+
+<p>
+The <em>Run</em> button will stop executing once the CPU halts. However you can force the machine
+to continue execution by hitting Run again.
+
+The <em>Tick</em> button will ignore the CPU state and fetch the next instruction regardless.
+</p>
+
+<p>
+
+</p>
+			</div>
+
+		</div>
+
+		<div class="container">
+			<div class="footer">
+				<p class="text-muted">&copy; 2014, Robbie Straw, All Rights Reserved.</p>
+			</div>
+		</div>
+	</body>
+</html>
