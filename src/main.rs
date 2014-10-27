@@ -89,8 +89,13 @@ fn main() {
 		let id = from_str::<i32>(req.param("id")).unwrap();
 		let mem_js = req.json_as::<Vec<String>>().unwrap();
 		let mem_native: Vec<u8> = mem_js.iter().map(|hex| {
-			hex.as_slice().from_hex().unwrap()[0]
+			match hex.as_slice().from_hex() {
+				Ok(decoded) => { if decoded.len() > 0 { decoded[0] } else { 0xFF } },
+				Err(msg) => { debug!("error reading json memory: {}", msg); 0xFF },
+			}
 		}).collect();
+
+		info!("length of mem instructions: {}", mem_native.len());
 
 		// pair odd u8s with even u8s to produce u16 ops.
 		let even_mn = mem_native.iter().enumerate().filter(|&(idx, _)| { idx % 2 == 0 });
