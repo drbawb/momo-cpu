@@ -89,7 +89,7 @@ impl P150Cpu {
 		//   lower byte: casting u16 -> u8 truncates leading bits
 		let op = (self.ir >> 12) as u8;
 		match op {
-			0x0   => { // MLOAD
+			0x1   => { // MLOAD
 				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_i0 = self.ir as u8;
 
@@ -97,7 +97,7 @@ impl P150Cpu {
 				Continue
 			},
 
-			0x1   => { // RSET
+			0x2   => { // RSET
 				let rloc = lo_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
 
@@ -105,7 +105,7 @@ impl P150Cpu {
 				Continue
 			},
 			
-			0x2   => { // MSTOR
+			0x3   => { // MSTOR
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_o0 = self.ir as u8;
 
@@ -113,7 +113,7 @@ impl P150Cpu {
 				Continue
 			},
 
-			0x3   => { // RMOV
+			0x4   => { // RMOV
 				let rloc_i0 = hi_nibble(self.ir as u8);
 				let rloc_o0 = lo_nibble(self.ir as u8);
 
@@ -122,44 +122,44 @@ impl P150Cpu {
 				Continue
 			},
 
-			0x4   => { // ADDB
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
-				let rloc_i1 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
-				let rloc_o0 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
+			0x5   => { // ADDB
+				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
+				let rloc_i0 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
+				let rloc_i1 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
 
 				self.reg[rloc_o0 as uint] = 
 					((self.reg[rloc_i0 as uint] as i8) + (self.reg[rloc_i1 as uint]as i8)) as u8;
 				Continue
 			},
 
-			0x6   => { // OR
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
+			0x7   => { // OR
+				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i0 = hi_nibble(self.ir as u8);
+				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
 				Continue
 			},
 
-			0x7   => { // AND
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
+			0x8   => { // AND
+				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i0 = hi_nibble(self.ir as u8);
+				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
 				Continue
 			},
 
-			0x8   => { // XOR
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
+			0x9   => { // XOR
+				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
+				let rloc_i0 = hi_nibble(self.ir as u8);
+				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
 				Continue
 			},
 
-			0x9   => { // ROT
+			0xA   => { // ROT
 				// LHS shifts <width> bits off the (left) end of the bitstring
 				// RHS shifts the bitstring to the right until only the bits which fell off remain.
 				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
@@ -172,7 +172,7 @@ impl P150Cpu {
 				Continue
 			},
 
-			0xA   => { // JMPEQ
+			0xB  => { // JMPEQ
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let next_ip = self.ir as u8;
 
@@ -180,7 +180,7 @@ impl P150Cpu {
 				Continue
 			},
 
-			0xB   => { Halt },
+			0xC   => { Halt },
 			_     => { debug!("halt, cpu on fire: {}", op); Halt },
 		}
 	}
@@ -214,7 +214,7 @@ fn hi_nibble(byte: u8) -> u8 {
 fn test_hammer_time() {
 	// cpu should stop after 1 tick of this program
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0xB000]);
+	cpu.init_mem([0xC000]);
 
 	assert_eq!(cpu.tick(), Halt)
 }
@@ -223,7 +223,7 @@ fn test_hammer_time() {
 fn test_registers() {
 	// cpu should set, move registers accordingly
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1110, 0x3013, 0xB000]);
+	cpu.init_mem([0x2110, 0x4013, 0xC000]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], 0x10)
@@ -234,7 +234,7 @@ fn test_memory() {
 	// memory sets and memory stores should read back successfully
 	// uninitialized registers should not match initialized registers
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1120, 0x1330, 0x2140, 0x0240, 0xB000]);
+	cpu.init_mem([0x2120, 0x2330, 0x3140, 0x1240, 0xC000]);
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
@@ -245,7 +245,7 @@ fn test_memory() {
 fn test_bin() {
 	// tests the various binary operations against their rustc counterparts.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1121, 0x1222, 0x6123, 0x7124, 0x8125, 0xB000]);
+	cpu.init_mem([0x2121, 0x2222, 0x7312, 0x8412, 0x9512, 0xC000]);
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x3] == (0x21 | 0x22));
@@ -257,7 +257,7 @@ fn test_bin() {
 fn test_math() {
 	// tests basic 2s comp. addition
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1120, 0x120A, 0x4123, 0xB000]);
+	cpu.init_mem([0x2120, 0x220A, 0x5312, 0xC000]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
@@ -269,7 +269,7 @@ fn test_math_sub() {
 	// tests basic 2s comp subtraction
 	let mut cpu = P150Cpu::new();
 
-	cpu.init_mem([0x1130, 0x12FA, 0x4123, 0xB000]);
+	cpu.init_mem([0x2130, 0x22FA, 0x5312, 0xC000]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
@@ -281,7 +281,7 @@ fn test_math_sub() {
 fn test_branch() {
 	// checks that the program branches; skipping a halt and setting a status register
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1021, 0x1121, 0xA108, 0xB000, 0x122A, 0xB000]);
+	cpu.init_mem([0x2021, 0x2121, 0xB108, 0xC000, 0x222A, 0xC000]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x2], 0x2A)
@@ -294,7 +294,7 @@ fn test_shift() {
 	//
 	// NOTE: shifting 12 bits (12 - 8) and 4 bits should be equivalent.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x10B0, 0x11B0, 0x90C0, 0x9140, 0xB000]);
+	cpu.init_mem([0x20B0, 0x21B0, 0xA0C0, 0xA140, 0xC000]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x0], 0x0B);
@@ -307,7 +307,7 @@ fn test_shift_right() {
 	// this arbitrary shift tests the directionality of the shift; 
 	//   which should be TO THE RIGHT.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x100C, 0x9030, 0xB000]);
+	cpu.init_mem([0x200C, 0xA030, 0xC000]);
 	boot(&mut cpu);
 
 	// 0b0000_1100 3-> == 0b1000_0001
@@ -324,7 +324,7 @@ fn test_shift_left() {
 	//
 
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x100C, 0x9030, 0xB000]);
+	cpu.init_mem([0x200C, 0xA030, 0xC000]);
 	boot(&mut cpu);
 
 	// 0b0000_1100 <-3 == 0b0110_0000
