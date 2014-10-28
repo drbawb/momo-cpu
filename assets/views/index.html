@@ -74,6 +74,18 @@
 					$('#cpu-core').html(tCpu(cpuState));
 					$('#cpu-box').html(tReg(viewReg(cpuState.reg)));
 					$('#cpu-box').append(tMem(viewMem(cpuState.mem)));
+
+					$('#init-machine').on('click', function(evt) {
+						loadMem();
+					});
+
+					$('#tick-machine').on('click', function(evt) {
+						tickMem();
+					});
+
+					$('#run-machine').on('click', function(evt) {
+						runMem();
+					});
 				};
 
 				//init-machine, run-machine
@@ -90,18 +102,6 @@
 						
 						cpuState = JSON.parse(data);
 						loadCpu(cpuState);
-						
-						$('#init-machine').on('click', function(evt) {
-							loadMem().then(dumpCpu);
-						});
-
-						$('#tick-machine').on('click', function(evt) {
-							tickMem().then(dumpCpu);
-						});
-
-						$('#run-machine').on('click', function(evt) {
-							runMem().then(dumpCpu);
-						});
 					});
 				};
 
@@ -121,17 +121,24 @@
 					console.log("calling ajax");
 					return $.post('/cpu/' + cpuId + '/load', JSON.stringify(memArr), function(data) {
 						console.log("cpu load: GREAT SUCCESS ^^,");
+
+						cpuState = JSON.parse(data);
+						loadCpu(cpuState);
 					});
 				};
 
 				var tickMem = function() {
 					return $.post('/cpu/' + cpuId + '/tick', function(data) {
 						console.log("cpu ran successfully, loading ...");
+						cpuState = JSON.parse(data);
+						loadCpu(cpuState);
 					});
 				};
 				var runMem = function() {
 					return $.post('/cpu/' + cpuId + '/run', function(data) {
 						console.log("cpu ran successfully, loading ...");
+						cpuState = JSON.parse(data);
+						loadCpu(cpuState);
 					});
 				};
 
