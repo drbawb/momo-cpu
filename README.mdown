@@ -1,50 +1,220 @@
-P150 Emulator Website
+Project MOMO
 ===
 
-This is the fully-functional P150 emulator exposed through a HTTP/REST frontend.
-This site, and the P150 emulator itself, are written in the [Rust](http://rust-lang.org) programming
-language.
+The PANTHER-150, or P150, is a fictional CPU designed during the UWM CS150 course: Survey of Computer Science.  
+This is an emulator for the CPU as described in class. Opcodes are arbitrarily assigned and do not necessarily
+match those described in the text.
 
-Source code for the emulator is availble on [BitBucket](https://bitbucket.org/drbawb/momo-cpu).
-You should be able to compile and run the emulator on Mac, Linux, BSD, and possibly Windows.
+The order of operands for any given instruction may also deviate from what's in the text.
+In general the P150 instructions prefer to pack nibbles towards the front, and full bytes towards
+the end of an instruction.
 
----
+This program is protected by copyright; modification and distribution are permitted 
+freely under the terms of a BSD-style license. See the `LICENSE`, which should have 
+been included with your copy of the software, for additional details.
 
-GET /
-	Fetches the welcome page.
-	This will load the javascript client on the users machine.
+CPU
+===
 
-POST /cpu/new
-	RETURNS: JSON:Number
-	Creates a new virtual CPU and returns the CPU identifier to the client.
-	This CPU ID can be used to execute further instructions.
 
-POST /cpu/{id}/load
-	PARAMS: JSON:Array (max-len 128, a series of 2-byte instructions to be loaded into machine memory)
-	RETURNS: JSON:Object (CpuState)
-	Loads the requested CPU id with the supplied memory instructions.
-	(Note that calling this function implicitly resets the IP to address 0x00)
+```
+Register Width:     8-bits
+Reg. Address Width: 4-bits
+Reg. Addresses:     0-15 	(0-F)
 
-POST /cpu/{id}/run
-	RETURNS: { cpu: JSON:Object (CpuState), instr: JSON:Array (Instructions) }
-	The requested CPU id will run its loaded program to completion.
-	The CPU is limited to a maximum number of 10,000 ticks. 
-	Regardless; once the CPU has halted its last known state will be returned.
+PC: 08-bits
+IR: 16-bits
+```
 
-	An additional `instr` array contains a trace of all IP/IR changes the CPU performed.
-	This can be useful for debugging purposes.
 
----
+MEMORY
+======
 
-POST /cpu/{id}/tick
-	???
-	Performs _exactly_ one complete fetch/decode/execute cycle and returns the machine state. 
-	WARNING: This function will cycle _even if the last instruction halted the CPU._
-			 Also note that the IP will eventually overflow to 0x00.
+```
+Cell Width:    8-bits
+Address Width: 8-bits
+Addresses:     0-255 	(00-FF)
+```
 
-POST /cpu/{id}/save
-	???
-	The requested CPU virtual machine state will be persisted and given a permanent URL.
-	You can use this to share your P150 programs with other users.
+INSTRUCTIONS
+============
 
+These 12 instructions are encoded as a 4-bit opcode followed by up to 12-bits of operands.
+Thus each instruction is (up to) 16-bits wide.
+
+### Instruction Table
+
+OPCODE       | INSTRUCTION | SIGNATURE
+-------------|-------------|-------------
+0x1          | MLOAD       | `RXY`, `R <- MEM[XY]`
+0x2          |  RSET       | `RXY`, `R <- XY`
+0x3          | MSTOR       | `RXY`, `R -> MEM[XY]`
+0x4          |  RMOV       | `0RS`, `R -> S`
+0x5          |  ADDB       | `RST`, `R <- S + T`
+0x6          |  ADDF       | `RST`, `R <- S + T`
+0x7          |    OR       | `RST`, `R <- S OR T`
+0x8          |   AND       | `RST`, `R <- S AND T`
+0x9          |   XOR       | `RST`, `R <- S XOR T`
+0xA          |   ROT       | `R0X`, `R <- R rotated right X times`
+0xB          | JMPEQ       | `RXY`, `IF R = REG[0], THEN: set PC to XY`
+0xC          |   HLT       | `000`, `STOP PROGRAM`
+0x0, 0xD-0xF | RESERVED    | `000`, Reserved for future expansion
+
+Instructions are encoded as 2 bytes, or four hexadecimal digits.
+An opcode (1-hex) followed by _up to_ three additional hex digits.
+
+	0x_ _ _ _
+	  | | | L----> third hex
+	  | | L------> second hex
+	  | L--------> first hex
+	  L----------> opcode
+
+An example of a `0-hex` instruction is the HLT instruction
+
+	0xC 0 0 0
+	  | |
+	  | |
+	  | L-----> unused
+	  L-------> opcode 	(halt)
+
+
+An example of a `3-hex` instruction where each hex is a single operand 
+is the addition instruction:
+
+	0x5 6 2 4
+	  | | | L----> second input       (register 2)
+	  | | L------> first input        (register 4) +
+      | L--------> output             (register 6) =
+      L----------> opcode (add)
+
+A slightly different example of a `3-hex` instruction is indirect loading.
+Here the second and third hex, together, are used to describe a memory location:
+
+	0x1 2 4 F
+	  | | | 
+	  | | L-----> output loc.	(address 0x4F)
+      | L-------> storage reg.  (register 0x2)
+      L---------> opcode		(mload)
+
+
+### Bitstring Operations (6 instructions)
+
+ADDB: "Add Binary"	(12-bits / 3-hex)
+
+  * Adds two numbers together, assuming they are encoded as 2's complement 8-bit.
+  * Requires three register addresses: (R1, R2, R3)
+
+ADDF: "Add Float"	(12-bits / 3-hex)
+
+  * Adds two numbers together, assuming they are encoded as 2's complement 8-bit.
+  * Adds two numbers together, assuming they are encoded as `<to be specified>` floating point numbers.
+  * Requires three register addresses: (R1, R2, R3)
+
+ROT: "Rotate" 	(8-bits / 2-hex)
+
+  * Rotates some bitstring leftwise. As the MSB falls off it wraps around to the LSB.
+  * Requires one register address (R1) as well as a 4-bit constant indicating number of bits to shift.
+    * (Shifts greater than 0100 are redundant.)
+
+AND, OR, XOR: "Logical Operations",  (12-bits / 3-hex)
+
+  * Produces the logical `(AND | OR | XOR)` of two bitstrings.
+  * Requires three register addresses: (R1, R2, R3)
+
+### Memory Operations (4 instructions)
+
+MLOAD: "Memory Cell Load" (12-bits / 3-hex)
+
+  * Loads the value from a memory cell into a register.
+  * Requires one register address (R1) as well as an 8-bit constant representing a memory address.
+
+MSTOR: "Memory Cell Store" (12-bits / 3-hex)
+
+  * Stores the value from a register into a memory cell
+  * Requires one register address as well as an 8-bit constant representing a memory address.
+
+RMOV: "Register Move" (8-bits / 2-hex)
+
+  * Moves a value from one register location to another.
+  * Requires one register address as well as a 4-bit constant representing a register address.
+
+RSET: "Register Set" (12-bits / 3-hex)
+
+  * Loads a constant value into a register location.
+  * Requires one register address (R0) as well as an 8-bit constant
+
+### Programmability (2 instructions)
+
+JMPEQ: "Jump if equal" (12-bits / 3-hex)
+
+  * Requires one register address (R1) as well as one memory address (M1)
+  * R1 is compared to the first register (0x0), if the bitstrings are identical
+    then the program counter is set to `M1`
+  * Otherwise the program counter remains unchanged
+
+HLT: "Halt Machine" (0-hex)
+
+  * Requests that the CPU interrupt the next fetch.
+
+Emulator Notes
+===
+
+  * The current CPU and memory state will only be printed when the program halts.
+  * Each emulator tick processes exactly one opcode.
+  * Floating point addition is not implemened
+
+Server API
+===
+
+The emulator is bundled with an HTTP server. This server exposes the CPU
+state as JSON.
+
+The server's API is as follows:
+
+* `GET /`
+    * Loads the official javascript client for interacting with this server.
+
+* `GET /about`
+    * Loads an FAQ / informational page.
+
+* `GET /cpu/new`
+    * Returns a JSON encoded integer.
+    * This integer is your CPUs unique ID. It will be used as `{id}` in all subsequent requests.
+
+* `POST /cpu/{id}/load`
+    * Takes an array of 256 hexadecimal bytes. (256 groups of 2 hexadecimal digits.)
+        * e.g: ["C0", "00", ...] would represent a program that halts immediately.
+    * These hexadecimal digits are converted to 256 bytes and stored in the CPUs memory.
+        * Hexadecimal digits longer than 1 byte (2 hex digits) are set to 0xFF.
+        * Invalid hex digits are set to 0xFF.
+    * The CPU's PC and IR are reset to `0x00`
+    * The CPU is returned as JSON.
+
+* `POST /cpu/{id}/run`
+    * Runs the program in the CPUs current memory.
+        * Stops when 0xC000 is executed OR
+        * 10,000 instructions are executed, total.
+    * The resulting CPU state is returned as JSON.
+
+* `POST /cpu/{id}/tick`
+    * Force the CPU to fetch, decode, and execute the next memory cell
+    pointed to by the PC.
+    * Returns the resulting CPU state as JSON.
+        * Note that the CPU _may exhibit_ undefined behavior as you can force
+          it to execute memory after it would've ordinarily halted.
+
+
+Running the emulator
+===
+
+The emulator is written in `rust` and packaged with the `cargo` tool.
+You can follow the [rust guide](http://doc.rust-lang.org/guide.html#installing-rust) to 
+install these two programs on any PC running Mac OS X, Linux, or Windows.
+
+* To clone the git repository run: `git clone https://bitbucket.org/drbawb/momo-cpu.git`
+* To build the program simply run the command `cargo build` 
+* To run the program type `cargo run`
+
+This will start a web server at `http://localhost:3200`  
+Browsing to this address will let you run the CPU interactively.
 
