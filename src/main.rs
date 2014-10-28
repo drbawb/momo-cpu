@@ -1,312 +1,201 @@
 #![feature(phase)]
 #[phase(plugin, link)] extern crate log;
+#[phase(plugin)] extern crate nickel_macros;
+extern crate nickel;
+extern crate serialize;
 
-// masks for pulling nibbles out of bytes
-const BYTE_WIDTH: uint = 8;
-const U4_LOW:     u8   = 0b00001111;
-const U4_HIGH:    u8   = 0b11110000;
+use p150::P150Cpu;
 
+use serialize::json;
+use serialize::hex::FromHex;
+use std::collections::HashMap;
+use std::io::net::ip::Ipv4Addr;
+use std::sync::{Arc,RWLock};
+use nickel::{JsonBody, Nickel, Request, Response};
+use nickel::{Middleware, HttpRouter, StaticFilesHandler};
+use nickel::{MiddlewareResult, NickelError};
 
-/// If the CPU enters the `Halt` state then any additional ticks will result in
-/// the program exhibiting undefined behavior.
+mod p150;
+
+static MAX_CYCLES: i32 = 100000; // maximum number of cycles CPU can execute to prevent DoS attacks.
+
+/// Injects a mutex-protected CpuServ into request map when invoked
+struct CpuMw { db: Arc<RWLock<CpuServ>> }
+
+/// A database of multiple uniquely identified P150 CPU emulators.
 ///
-#[deriving(PartialEq,Show)]
-enum CpuState {
-	Continue,
-	Halt,
+/// Each emulator maintains its own state and can be recalled
+/// using the integer identification.
+struct CpuServ {
+	next_cpu: i32,
+	database: HashMap<i32, P150Cpu>,
 }
 
-/// The P150 virtual machine
-/// Represents all information the CPU needs to continue executing a
-/// program stored in its main memory.
-struct P150Cpu {
-	ip:  u8,
-	ir: u16,
-
-	reg: [u8, ..16],
-	mem: [u8, ..256],
-}
-
-impl P150Cpu {
-	/// Initializes the P150 CPU
-	///
-	/// NOTE: This implementation 0s memory; but this is not guaranteed
-	/// by the machine specification.
-	///
-	/// Programs MUST start at memory address 0x00
-	fn new() -> P150Cpu {
-		P150Cpu {
-			ip:  0x00,
-			ir:  0x0000,
-
-			reg: [0u8, ..16],
-			mem: [0u8, ..256],
-		}
-	}
-
-	/// Prints the current machine state to the console window
-	/// This includes the IP, IR, and all registers.
-	/// (Registers will be formatted as 2s complement numbers.)
-	fn dump(&self) {
-		println!("IP: 0x{:02X}, IR: 0x{:04X}", self.ip, self.ir);
-
-		println!("---\nRegisters\n---")
-		for (addr, cell) in self.reg.iter().enumerate() {
-			println!("{:01X}: {}", addr, cell)
-		}
-
-		println!("---")
-
-		debug!("Memory")
-		for (addr, cell) in self.mem.iter().enumerate() {
-			debug!("{:02X}: {}", addr, cell)
-		}
-	}
-
-	#[cfg(test)]
-	fn get_reg(&self) -> &[u8] { self.reg }
-
-	/// Read an array of instructions into main memory
-	/// This reads two bytes at a time from the `memory` array
-	/// and loads them into the P150s RAM bank, starting from address 0.
-	fn init_mem(&mut self, memory: &[u16]) {
-		assert!(memory.len() < (256 / 2)); // program cannot be larger than memory
-		let mut next_cell = 0x00;
-
-		// zero memory
-		self.mem = [0, ..256];
-		for op in memory.iter() {
-			let byte_1 = (*op >> 8) as u8;
-			let byte_2 = *op as u8;
-
-			self.mem[next_cell]     = byte_1;
-			self.mem[next_cell + 1] = byte_2;
-			next_cell += 2
-		}
-	}
-
-	/// Runs the entire fetch, execute, decode cycle against the current IP
-	fn tick(&mut self) -> CpuState {
-		self.fetch();
-
-		// decode & execute
-		let op = (self.ir >> 12) as u8;
-		match op {
-			0x0   => { // ADDB
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);   // first input: lower nibble of first byte
-				let rloc_i1 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
-				let rloc_o0 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
-
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] + self.reg[rloc_i1 as uint];
-				Continue
-			},
-
-			0x2   => { // ROT
-				// LHS shifts <width> bits off the (left) end of the bitstring
-				// RHS shifts the bitstring to the right until only the bits which fell off remain.
-				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
-				//   ∴ LHS <OR> RHS provides a rotated bitstring
-				//
-				let rloc_i0   = lo_nibble((self.ir >> 8) as u8) as uint;          // register is first nibble ...
-				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as uint; // last three bytes of second nibble ...
-				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] << swidth) | (self.reg[rloc_i0] >> (BYTE_WIDTH - swidth));
-
-				Continue
-			},
-
-			0x3   => { // AND
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
-
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
-				Continue
-			},
-
-			0x4   => { // OR
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
-
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
-				Continue
-			},
-
-			0x5   => { // XOR
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_i1 = hi_nibble(self.ir as u8);
-				let rloc_o0 = lo_nibble(self.ir as u8);
-
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
-				Continue
-			},
-
-			0x6   => { // MLOAD
-				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
-				let mloc_i0 = self.ir as u8;
-
-				self.reg[rloc_o0 as uint] = self.mem[mloc_i0 as uint];
-				Continue
-			},
-
-			0x7   => { // MSTOR
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let mloc_o0 = self.ir as u8;
-
-				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
-				Continue
-			},
-
-			0x8   => { // RMOV
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_o0 = hi_nibble(self.ir as u8);
-
-				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
-				Continue
-			},
-
-			0x9   => { // RSET
-				let rloc = lo_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
-				let rval = self.ir as u8;                    // value is entire second byte
-
-				self.reg[rloc as uint] = rval;               // store value in register
-				Continue
-			},
-
-			0xA   => { // JMPEQ
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let next_ip = self.ir as u8;
-
-				if self.reg[rloc_i0 as uint] == self.reg[0] { self.ip = next_ip }
-				Continue
-			},
-
-			0xB   => { Halt },
-			_     => { debug!("halt, cpu on fire: {}", op); Halt },
-		}
-	}
-
-	/// Load the instruction at `IP` and advance the pointer by two bytes.
-	/// The instruction is packed into a single `u16` and stored in the instruction register.
-	fn fetch(&mut self) {
-		// fetch two bytes from PC
-		let byte_1 = self.mem[(self.ip+0) as uint];
-		let byte_2 = self.mem[(self.ip+1) as uint];
-
-		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16); // load byets into IR
-		self.ip += 2;                                      // increment instruction pointer
-
-		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
+impl Middleware for CpuMw {
+	fn invoke(&self, req: &mut Request, _res: &mut Response) -> MiddlewareResult {
+		req.map.insert(self.db.clone());
+		Ok(nickel::Continue)
 	}
 }
 
-/// Take the lower nibble of a byte
-fn lo_nibble(byte: u8) -> u8 {
-	(byte & U4_LOW)
-}
-
-/// Take the upper nibble of a byte and shift it
-/// towards the least significant bits.
-fn hi_nibble(byte: u8) -> u8 {
-	(byte & U4_HIGH) >> 4
+impl CpuServ {
+	fn new() -> CpuServ {
+		CpuServ {
+			next_cpu: 0,
+			database: HashMap::new(),
+		}
+	}
 }
 
 fn main() {
-	let mut cpu = P150Cpu::new();
-	let program = [0x911E, 0x920C, 0x0123, 0x7340, 0x6040, 0xA310, 0x9500, 0xB000, 0x9501, 0xB000];
-	//            [0x00    0x02    0x04    0x06    0x08    0x0A    0x0C    0x0E    0x10    0x12  ]
+	let mut server = Nickel::new();
+	let mut router = Nickel::router();
 	
-	cpu.init_mem(program);
-	loop {
-		match cpu.tick() {
-			Continue => { continue; },
-			Halt => { println!("CPU halted."); cpu.dump(); break; },
+	fn index_show(_request: &Request, response: &mut Response) {
+		let mut page = HashMap::new();
+		page.insert("title", "P150 Emulator");
+
+		response.render("./assets/views/index.html", &page);
+	}
+
+	fn about_show(_request: &Request, response: &mut Response) {
+		let mut page = HashMap::new();
+		page.insert("title", "P150 Emulator");
+
+		response.render("./assets/views/about.html", &page);
+	}
+
+	/// POST /cpu/new: creates a new CPU and adds it to the CpuServ with the next
+	/// available ID number.
+	fn cpu_new(req: &Request, response: &mut Response) {
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let mut w_cpuserv = cpuserv.write();
+				let cpu_no = w_cpuserv.next_cpu;
+
+				w_cpuserv.database.insert(cpu_no, P150Cpu::new());
+				w_cpuserv.next_cpu += 1;
+
+				response.send(json::encode(&cpu_no));
+			},
+			None => { response.send("did not find cpu serv"); }
 		}
 	}
-}
 
-#[test]
-fn test_hammer_time() {
-	// cpu should stop after 1 tick of this program
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0xB000]);
+	/// POST /cpu/:id/load
+	/// Overwrites the CPUs system memory with response data.
+	/// The current machine state is then dumped into the response as JSON.
+	fn cpu_load(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		let mem_js = req.json_as::<Vec<String>>().unwrap();
+		let mem_native: Vec<u8> = mem_js.iter().map(|hex| {
+			match hex.as_slice().from_hex() {
+				Ok(decoded) => { if decoded.len() > 0 { decoded[0] } else { 0xFF } },
+				Err(msg) => { debug!("error reading json memory: {}", msg); 0xFF },
+			}
+		}).collect();
 
-	assert_eq!(cpu.tick(), Halt)
-}
+		info!("length of mem instructions: {}", mem_native.len());
 
-#[test]
-fn test_registers() {
-	// cpu should set, move registers accordingly
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x9110, 0x8130, 0xB000]);
-	boot(&mut cpu);
+		// pair odd u8s with even u8s to produce u16 ops.
+		let even_mn = mem_native.iter().enumerate().filter(|&(idx, _)| { idx % 2 == 0 });
+		let odd_mn  = mem_native.iter().enumerate().filter(|&(idx, _)| { idx % 2 != 0 });
+		let ops: Vec<u16> = even_mn.zip(odd_mn).map(|((_, &msb), (_, &lsb))| {
+			(msb as u16 << 8) | (lsb as u16)
+		}).collect();
 
-	assert_eq!(cpu.get_reg()[0x3], 16)
-}
-
-#[test]
-fn test_memory() {
-	// memory sets and memory stores should read back successfully
-	// uninitialized registers should not match initialized registers
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x9120, 0x9330, 0x7140, 0x6240, 0xB000]);
-	boot(&mut cpu);
-
-	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
-	assert!(cpu.get_reg()[0x1] != cpu.get_reg()[0x3]);
-}
-
-#[test]
-fn test_bin() {
-	// tests the various binary operations against their rustc counterparts.
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x9121, 0x9222, 0x3123, 0x4124, 0x5125, 0xB000]);
-	boot(&mut cpu);
-
-	assert!(cpu.get_reg()[0x3] == (0x21 & 0x22));
-	assert!(cpu.get_reg()[0x4] == (0x21 | 0x22));
-	assert!(cpu.get_reg()[0x5] == (0x21 ^ 0x22));
-}
-
-#[test]
-fn test_math() {
-	// tests basic 2s comp. addition
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x9120, 0x920A, 0x0123, 0xB000]);
-	boot(&mut cpu);
-
-	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2])
-}
-
-#[test]
-fn test_branch() {
-	// checks that the program branches; skipping a halt and setting a status register
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x9021, 0x9121, 0xA108, 0xB000, 0x922A, 0xB000]);
-	boot(&mut cpu);
-
-	assert_eq!(cpu.get_reg()[0x2], 0x2A)
-}
-
-#[test]
-fn test_shift() {
-	// checks that the program rotates a single nibble 4 places
-	// this should move a single hex digit from the lhs to the rhs.
-	//
-	// NOTE: shifting 12 bits (12 - 8) and 4 bits should be equivalent.
-	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x90B0, 0x91B0, 0x20C0, 0x2140, 0xB000]);
-	boot(&mut cpu);
-
-	assert_eq!(cpu.get_reg()[0x0], 0x0B);
-	assert_eq!(cpu.get_reg()[0x1], 0x0B);
-}
-
-#[cfg(test)]
-fn boot(cpu: &mut P150Cpu) {
-	loop {
-		if cpu.tick() == Halt { break; }
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				match cpuserv.write().database.find_mut(&id) {
+					Some(cpu) => {
+						cpu.init_mem(ops.as_slice()); // TODO: load from req.
+						response.send(format!("{}", cpu.js_dump()));
+					},
+					None => { response.send("did not find the cpu") },
+				};
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
 	}
+
+	/// POST /cpu/:id/dump
+	/// Dumps the CPUs current state to a JSON format.
+	/// This request does not modify the CPU state in any way.
+	fn cpu_dump(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let r_serv = cpuserv.read();
+				let cpu        = r_serv.database.find(&id).unwrap();
+
+				response.send(format!("{}", cpu.js_dump()));
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
+	}
+
+
+	/// POST /cpu/:id/tick
+	/// Resumes execution from the next instruction; running the machine to completion.
+	/// The resultant state is then dumped to the console.
+	fn cpu_tick(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let mut w_serv = cpuserv.write();
+				let cpu        = w_serv.database.find_mut(&id).unwrap();
+				let _          = cpu.tick();
+
+				response.send(format!("{}", cpu.js_dump()));
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
+	}
+
+
+	/// POST /cpu/:id/run
+	/// Resumes execution from the next instruction; running the machine to completion.
+	/// The resultant state is then dumped to the console.
+	fn cpu_run(req: &Request, response: &mut Response) {
+		let id = from_str::<i32>(req.param("id")).unwrap();
+		
+		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+			Some(cpuserv) => {
+				let mut cycles = 0i32;
+				let mut w_serv = cpuserv.write();
+				let cpu    = w_serv.database.find_mut(&id).unwrap();
+				loop {
+					if cycles >= MAX_CYCLES { println!("CPU executed > {} cycles.", MAX_CYCLES); break; }
+					cycles += 1;
+
+					match cpu.tick() {
+						p150::Halt => { break; },
+						p150::Continue => { continue; },
+					}
+				}
+
+				response.send(format!("{}", cpu.js_dump()));
+			},
+			None => { response.send("did not find cpu serv"); }
+		}
+	}
+
+	router.get("/", index_show);
+	router.get("/about", about_show);
+
+	router.post("/cpu/new", cpu_new);
+	router.post("/cpu/:id/tick", cpu_tick);
+	router.post("/cpu/:id/run", cpu_run);
+	router.post("/cpu/:id/load", cpu_load);
+	router.get("/cpu/:id/dump", cpu_dump);
+	// TODO: /cpu/:id/tick, /cpu/:id/reset
+	// TODO: /cpu/:id/save ???
+
+	server.utilize(CpuMw { db: Arc::new(RWLock::new(CpuServ::new())) });
+	server.utilize(StaticFilesHandler::new("./public"));
+	server.utilize(Nickel::json_body_parser());
+	server.utilize(router);
+	
+	server.listen(Ipv4Addr(0,0,0,0), 3200);
 }
 

@@ -1,0 +1,134 @@
+<!doctype HTML>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<script src="js/bootstrap.js"></script>
+		
+		<link href="css/bootstrap.css" rel="stylesheet" />
+		<link href="css/bootstrap-theme.css" rel="stylesheet" />
+		<link href="css/main.css" rel="stylesheet" />
+		
+		<title>{{title}}</title>
+	</head>
+
+	<body>
+		<div class="container">
+			<div class="page-header">
+				<h1>PANTHER150 Machine Emulator</h1>
+				<p class="lead">
+					The little CPU that could ...
+				</p>
+
+				<ul class="nav nav-pills">
+					<li><a href="/">Emulator</a></li>
+					<li><a href="/about">About</a></li>
+				</ul>
+			</div>
+
+			<div class="row">
+				<div class="col-md-8">
+					<p>
+					The <strong>PANTHER150</strong> emulator is written in the <a href="http://rust-lang.org">Rust</a> 
+					programming language. The machine is laid out as:
+					<ul>
+						<li>A single byte for the instruction pointer</li>
+						<li>Two bytes for the current instruction</li>
+						<li>An array of 16 bytes for the CPU registers.</li>
+						<li>An array of 256 bytes for the system memory.</li>
+					</ul>
+					</p>
+				
+					<p>
+					The CPU matches the one described in class. The only notable difference
+					is that instructions are numbered starting from 0, not 1.
+					</p>
+
+					<h3> Instructions </h3>
+					<table style="border: 1px #000 solid; border-collapse: separate; border-spacing: 0.2em; padding: 5px;">
+						<thead>
+							<tr>
+								<th>OP</th>
+								<th>INSTRUCTION</th>
+								<th>DESCRIPTION</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>0x0</td>
+								<td>MLOAD</td>
+								<td>Load (Indirect)</td>
+							</tr>
+							<tr>
+								<td>0x1</td>
+								<td>RSET</td>
+								<td>Load (Direct)</td>
+							</tr>
+							<tr>
+								<td>0x2</td>
+								<td>MSTOR</td>
+								<td>Store (Indirect)</td>
+							</tr>
+							<tr>
+								<td>0x3</td>
+								<td>RMOV</td>
+								<td>Register Move</td>
+							</tr>
+							<tr>
+								<td>0x4</td>
+								<td>ADDB</td>
+								<td>Adds two bytes using 2s complement addition.</td>
+							</tr>
+							<tr>
+								<td>0x5</td>
+								<td>ADDF</td>
+								<td>(Unimplmented!)</td>
+							</tr>
+							<tr>
+								<td>0x6</td>
+								<td>OR</td>
+								<td>Logically ORs two bytes</td>
+							</tr>
+							<tr>
+								<td>0x7</td>
+								<td>AND</td>
+								<td>Logically ANDs two bytes</td>
+							</tr>
+							<tr>
+								<td>0x8</td>
+								<td>XOR</td>
+								<td>Logically XORs two bytes</td>
+							</tr>
+							<tr>
+								<td>0x9</td>
+								<td>ROT</td>
+								<td>Rotates bits off the right edge to the left edge.</td>
+							</tr>
+							<tr>
+								<td>0xA</td>
+								<td>JMPEQ</td>
+								<td>Sets IP based on register 0 comparison.</td>
+							</tr>
+							<tr>
+								<td>0xB</td>
+								<td>HLT</td>
+								<td>Causes the machine to stop execution.</td>
+							</tr>
+							<tr>
+								<td>0xC-0xF</td>
+								<td>RESERVED</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+		</div>
+		<div class="container">
+			<div class="footer">
+				<p class="text-muted">&copy; 2014, Robbie Straw, All Rights Reserved.</p>
+			</div>
+		</div>
+	</body>
+</html>
