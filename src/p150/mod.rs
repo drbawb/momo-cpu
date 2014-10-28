@@ -85,6 +85,8 @@ impl P150Cpu {
 		self.fetch();
 
 		// decode & execute
+		//   upper byte: shift u16 right 8 places, then cast to u8
+		//   lower byte: casting u16 -> u8 truncates leading bits
 		let op = (self.ir >> 12) as u8;
 		match op {
 			0x0   => { // MLOAD
@@ -112,8 +114,8 @@ impl P150Cpu {
 			},
 
 			0x3   => { // RMOV
-				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
-				let rloc_o0 = hi_nibble(self.ir as u8);
+				let rloc_i0 = hi_nibble(self.ir as u8);
+				let rloc_o0 = lo_nibble(self.ir as u8);
 
 				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
@@ -221,10 +223,10 @@ fn test_hammer_time() {
 fn test_registers() {
 	// cpu should set, move registers accordingly
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x1110, 0x3130, 0xB000]);
+	cpu.init_mem([0x1110, 0x3013, 0xB000]);
 	boot(&mut cpu);
 
-	assert_eq!(cpu.get_reg()[0x3], 16)
+	assert_eq!(cpu.get_reg()[0x3], 0x10)
 }
 
 #[test]
@@ -260,6 +262,19 @@ fn test_math() {
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
 	assert_eq!(cpu.get_reg()[0x3], 0x20 + 0x0A);
+}
+
+#[test]
+fn test_math_sub() {
+	// tests basic 2s comp subtraction
+	let mut cpu = P150Cpu::new();
+
+	cpu.init_mem([0x1130, 0x12FA, 0x4123, 0xB000]);
+	boot(&mut cpu);
+
+	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
+	assert_eq!(cpu.get_reg()[0x3], 0x30 + 0xFA);
+	assert_eq!(cpu.get_reg()[0x3], 0x30 - 0x06);
 }
 
 #[test]

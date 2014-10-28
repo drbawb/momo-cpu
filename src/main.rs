@@ -106,11 +106,13 @@ fn main() {
 
 		match req.map.find::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
-				let mut w_serv = cpuserv.write();
-				let cpu        = w_serv.database.find_mut(&id).unwrap();
-
-				cpu.init_mem(ops.as_slice()); // TODO: load from req.
-				response.send(format!("{}", cpu.js_dump()));
+				match cpuserv.write().database.find_mut(&id) {
+					Some(cpu) => {
+						cpu.init_mem(ops.as_slice()); // TODO: load from req.
+						response.send(format!("{}", cpu.js_dump()));
+					},
+					None => { response.send("did not find the cpu") },
+				};
 			},
 			None => { response.send("did not find cpu serv"); }
 		}
@@ -144,7 +146,7 @@ fn main() {
 				let cpu        = w_serv.database.find_mut(&id).unwrap();
 				let _          = cpu.tick();
 
-				response.send("");
+				response.send(format!("{}", cpu.js_dump()));
 			},
 			None => { response.send("did not find cpu serv"); }
 		}
@@ -156,6 +158,7 @@ fn main() {
 	/// The resultant state is then dumped to the console.
 	fn cpu_run(req: &Request, response: &mut Response) {
 		let id = from_str::<i32>(req.param("id")).unwrap();
+		
 		match req.map.find::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
 				let mut cycles = 0i32;
@@ -171,7 +174,7 @@ fn main() {
 					}
 				}
 
-				response.send("");
+				response.send(format!("{}", cpu.js_dump()));
 			},
 			None => { response.send("did not find cpu serv"); }
 		}
