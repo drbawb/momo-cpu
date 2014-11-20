@@ -13,7 +13,7 @@ use std::io::net::ip::Ipv4Addr;
 use std::sync::{Arc,RWLock};
 use nickel::{JsonBody, Nickel, Request, Response};
 use nickel::{Middleware, HttpRouter, StaticFilesHandler};
-use nickel::{MiddlewareResult, NickelError};
+use nickel::{MiddlewareResult};
 
 mod p150;
 
@@ -68,7 +68,7 @@ fn main() {
 	/// POST /cpu/new: creates a new CPU and adds it to the CpuServ with the next
 	/// available ID number.
 	fn cpu_new(req: &Request, response: &mut Response) {
-		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+		match req.map.get::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
 				let mut w_cpuserv = cpuserv.write();
 				let cpu_no = w_cpuserv.next_cpu;
@@ -104,9 +104,9 @@ fn main() {
 			(msb as u16 << 8) | (lsb as u16)
 		}).collect();
 
-		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+		match req.map.get::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
-				match cpuserv.write().database.find_mut(&id) {
+				match cpuserv.write().database.get_mut(&id) {
 					Some(cpu) => {
 						cpu.init_mem(ops.as_slice()); // TODO: load from req.
 						response.send(format!("{}", cpu.js_dump()));
@@ -123,10 +123,10 @@ fn main() {
 	/// This request does not modify the CPU state in any way.
 	fn cpu_dump(req: &Request, response: &mut Response) {
 		let id = from_str::<i32>(req.param("id")).unwrap();
-		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+		match req.map.get::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
 				let r_serv = cpuserv.read();
-				let cpu        = r_serv.database.find(&id).unwrap();
+				let cpu        = r_serv.database.get(&id).unwrap();
 
 				response.send(format!("{}", cpu.js_dump()));
 			},
@@ -140,13 +140,13 @@ fn main() {
 	/// The resultant state is then dumped to the console.
 	fn cpu_tick(req: &Request, response: &mut Response) {
 		let id = from_str::<i32>(req.param("id")).unwrap();
-		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+		match req.map.get::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
 				let mut w_serv = cpuserv.write();
-				let cpu        = w_serv.database.find_mut(&id).unwrap();
-				let _          = cpu.tick();
-
-				response.send(format!("{}", cpu.js_dump()));
+				match w_serv.database.get_mut(&id) {
+					Some(cpu) => { cpu.tick(); response.send(format!("{}", cpu.js_dump())); },
+					None => { response.send("did not find cpu"); }
+				};
 			},
 			None => { response.send("did not find cpu serv"); }
 		}
@@ -159,11 +159,11 @@ fn main() {
 	fn cpu_run(req: &Request, response: &mut Response) {
 		let id = from_str::<i32>(req.param("id")).unwrap();
 		
-		match req.map.find::<Arc<RWLock<CpuServ>>>() {
+		match req.map.get::<Arc<RWLock<CpuServ>>>() {
 			Some(cpuserv) => {
 				let mut cycles = 0i32;
 				let mut w_serv = cpuserv.write();
-				let cpu    = w_serv.database.find_mut(&id).unwrap();
+				let cpu    = w_serv.database.get_mut(&id).unwrap();
 				loop {
 					if cycles >= MAX_CYCLES { println!("CPU executed > {} cycles.", MAX_CYCLES); break; }
 					cycles += 1;
