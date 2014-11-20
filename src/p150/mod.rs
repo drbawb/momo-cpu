@@ -57,7 +57,7 @@ impl P150Cpu {
 	}
 
 	#[cfg(test)]
-	fn get_reg(&self) -> &[u8] { self.reg }
+	fn get_reg(&self) -> &[u8] { self.reg.as_slice() }
 
 	/// Read an array of instructions into main memory
 	/// This reads two bytes at a time from the `memory` array
@@ -94,7 +94,7 @@ impl P150Cpu {
 				let mloc_i0 = self.ir as u8;
 
 				self.reg[rloc_o0 as uint] = self.mem[mloc_i0 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0x2   => { // RSET
@@ -102,7 +102,7 @@ impl P150Cpu {
 				let rval = self.ir as u8;                    // value is entire second byte
 
 				self.reg[rloc as uint] = rval;               // store value in register
-				Continue
+				CpuState::Continue
 			},
 			
 			0x3   => { // MSTOR
@@ -110,7 +110,7 @@ impl P150Cpu {
 				let mloc_o0 = self.ir as u8;
 
 				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0x4   => { // RMOV
@@ -119,7 +119,7 @@ impl P150Cpu {
 
 				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0x5   => { // ADDB
@@ -129,7 +129,7 @@ impl P150Cpu {
 
 				self.reg[rloc_o0 as uint] = 
 					((self.reg[rloc_i0 as uint] as i8) + (self.reg[rloc_i1 as uint]as i8)) as u8;
-				Continue
+				CpuState::Continue
 			},
 
 			0x7   => { // OR
@@ -138,7 +138,7 @@ impl P150Cpu {
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0x8   => { // AND
@@ -147,7 +147,7 @@ impl P150Cpu {
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0x9   => { // XOR
@@ -156,7 +156,7 @@ impl P150Cpu {
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
 				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
-				Continue
+				CpuState::Continue
 			},
 
 			0xA   => { // ROT
@@ -169,7 +169,7 @@ impl P150Cpu {
 				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as uint; // last three bytes of second nibble ...
 				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] >> swidth) | (self.reg[rloc_i0] << (BYTE_WIDTH - swidth));
 
-				Continue
+				CpuState::Continue
 			},
 
 			0xB  => { // JMPEQ
@@ -177,11 +177,11 @@ impl P150Cpu {
 				let next_ip = self.ir as u8;
 
 				if self.reg[rloc_i0 as uint] == self.reg[0] { self.ip = next_ip }
-				Continue
+				CpuState::Continue
 			},
 
-			0xC   => { Halt },
-			_     => { debug!("halt, cpu on fire: {}", op); Halt },
+			0xC   => { CpuState::Halt },
+			_     => { debug!("halt, cpu on fire: {}", op); CpuState::Halt },
 		}
 	}
 
@@ -214,16 +214,16 @@ fn hi_nibble(byte: u8) -> u8 {
 fn test_hammer_time() {
 	// cpu should stop after 1 tick of this program
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0xC000]);
+	cpu.init_mem([0xC000].as_slice());
 
-	assert_eq!(cpu.tick(), Halt)
+	assert_eq!(cpu.tick(), CpuState::Halt)
 }
 
 #[test]
 fn test_registers() {
 	// cpu should set, move registers accordingly
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2110, 0x4013, 0xC000]);
+	cpu.init_mem([0x2110, 0x4013, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], 0x10)
@@ -234,7 +234,7 @@ fn test_memory() {
 	// memory sets and memory stores should read back successfully
 	// uninitialized registers should not match initialized registers
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2120, 0x2330, 0x3140, 0x1240, 0xC000]);
+	cpu.init_mem([0x2120, 0x2330, 0x3140, 0x1240, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
@@ -245,7 +245,7 @@ fn test_memory() {
 fn test_bin() {
 	// tests the various binary operations against their rustc counterparts.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2121, 0x2222, 0x7312, 0x8412, 0x9512, 0xC000]);
+	cpu.init_mem([0x2121, 0x2222, 0x7312, 0x8412, 0x9512, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x3] == (0x21 | 0x22));
@@ -257,7 +257,7 @@ fn test_bin() {
 fn test_math() {
 	// tests basic 2s comp. addition
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2120, 0x220A, 0x5312, 0xC000]);
+	cpu.init_mem([0x2120, 0x220A, 0x5312, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
@@ -269,7 +269,7 @@ fn test_math_sub() {
 	// tests basic 2s comp subtraction
 	let mut cpu = P150Cpu::new();
 
-	cpu.init_mem([0x2130, 0x22FA, 0x5312, 0xC000]);
+	cpu.init_mem([0x2130, 0x22FA, 0x5312, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
@@ -281,7 +281,7 @@ fn test_math_sub() {
 fn test_branch() {
 	// checks that the program branches; skipping a halt and setting a status register
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2021, 0x2121, 0xB108, 0xC000, 0x222A, 0xC000]);
+	cpu.init_mem([0x2021, 0x2121, 0xB108, 0xC000, 0x222A, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x2], 0x2A)
@@ -294,7 +294,7 @@ fn test_shift() {
 	//
 	// NOTE: shifting 12 bits (12 - 8) and 4 bits should be equivalent.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x20B0, 0x21B0, 0xA0C0, 0xA140, 0xC000]);
+	cpu.init_mem([0x20B0, 0x21B0, 0xA0C0, 0xA140, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x0], 0x0B);
@@ -307,7 +307,7 @@ fn test_shift_right() {
 	// this arbitrary shift tests the directionality of the shift; 
 	//   which should be TO THE RIGHT.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x200C, 0xA030, 0xC000]);
+	cpu.init_mem([0x200C, 0xA030, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	// 0b0000_1100 3-> == 0b1000_0001
@@ -324,7 +324,7 @@ fn test_shift_left() {
 	//
 
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x200C, 0xA030, 0xC000]);
+	cpu.init_mem([0x200C, 0xA030, 0xC000].as_slice());
 	boot(&mut cpu);
 
 	// 0b0000_1100 <-3 == 0b0110_0000
@@ -335,7 +335,7 @@ fn test_shift_left() {
 #[cfg(test)]
 fn boot(cpu: &mut P150Cpu) {
 	loop {
-		if cpu.tick() == Halt { break; }
+		if cpu.tick() == CpuState::Halt { break; }
 	}
 }
 

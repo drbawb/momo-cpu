@@ -4,7 +4,7 @@
 extern crate nickel;
 extern crate serialize;
 
-use p150::P150Cpu;
+use p150::{CpuState, P150Cpu};
 
 use serialize::json;
 use serialize::hex::FromHex;
@@ -169,8 +169,8 @@ fn main() {
 					cycles += 1;
 
 					match cpu.tick() {
-						p150::Halt => { break; },
-						p150::Continue => { continue; },
+						CpuState::Halt => { break; },
+						CpuState::Continue => { continue; },
 					}
 				}
 
