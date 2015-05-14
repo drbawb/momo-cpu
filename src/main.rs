@@ -24,13 +24,18 @@ static MAX_CYCLES: i32 = 100000; // maximum number of cycles CPU can execute to 
 struct CpuDb;
 impl Key for CpuDb { type Value = Arc<RwLock<CpuServ>>; }
 
+struct CpuClient {
+	pub state: P150Cpu,
+	pub last:  P150Cpu,
+}
+
 /// A database of multiple uniquely identified P150 CPU emulators.
 ///
 /// Each emulator maintains its own state and can be recalled
 /// using the integer identification.
 struct CpuServ {
 	next_cpu: i32,
-	database: HashMap<i32, P150Cpu>,
+	database: HashMap<i32, CpuClient>,
 }
 
 impl CpuServ {
@@ -64,6 +69,7 @@ fn main() {
 
 	router.post("/cpu/new", cpu_new);
 	router.post("/cpu/:id/tick", cpu_tick);
+	router.post("/cpu/:id/back", cpu_back);
 	router.post("/cpu/:id/run", cpu_run);
 	router.post("/cpu/:id/load", cpu_load);
 	router.get("/cpu/:id/dump", cpu_dump);
@@ -100,7 +106,12 @@ fn cpu_new<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'a
 			let mut w_cpuserv = cpuserv.write().unwrap();
 			let cpu_no = w_cpuserv.next_cpu;
 
-			w_cpuserv.database.insert(cpu_no, P150Cpu::new());
+			let client = CpuClient {
+				state: P150Cpu::new(),
+				last:  P150Cpu::new(),
+			};
+
+			w_cpuserv.database.insert(cpu_no, client);
 			w_cpuserv.next_cpu += 1;
 
 			response.send(json::encode(&cpu_no).ok().unwrap())
@@ -136,8 +147,10 @@ fn cpu_load<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'
 		Some(cpuserv) => {
 			match cpuserv.write().unwrap().database.get_mut(&id) {
 				Some(cpu) => {
-					cpu.init_mem(&ops[..]); // TODO: load from req.
-					response.send(format!("{}", cpu.js_dump()))
+					cpu.state.init_mem(&ops[..]); // TODO: load from req.
+					cpu.last = cpu.state;
+
+					response.send(format!("{}", cpu.state.js_dump()))
 				},
 				None => { response.send("did not find the cpu") },
 			}
@@ -155,9 +168,9 @@ fn cpu_dump<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'
 	match req.extensions().get::<CpuDb>() {
 		Some(cpuserv) => {
 			let r_serv = cpuserv.read().unwrap();
-			let cpu        = r_serv.database.get(&id).unwrap();
+			let cpu    = r_serv.database.get(&id).unwrap();
 
-			response.send(format!("{}", cpu.js_dump()))
+			response.send(format!("{}", cpu.state.js_dump()))
 		},
 		None => { response.send("did not find cpu serv") }
 	}
@@ -174,12 +187,36 @@ fn cpu_tick<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'
 		Some(cpuserv) => {
 			let mut w_serv = cpuserv.write().unwrap();
 			match w_serv.database.get_mut(&id) {
-				Some(cpu) => { cpu.tick(); response.send(format!("{}", cpu.js_dump())) },
+				Some(cpu) => {
+					cpu.last = cpu.state;
+					cpu.state.tick(); 
+					response.send(format!("{}", cpu.state.js_dump())) 
+				},
+
 				None => { response.send("did not find cpu") }
 			}
 		},
 
 		None => { response.send("did not find cpu serv") }
+	}
+}
+
+/// POST /cpu/:id/back
+/// Rewinds the CPU to the last good state.
+/// States are snapshotted _before_ a /tick or /run
+fn cpu_back<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'a> {
+	let id = req.param("id").parse::<i32>().ok().expect("unable to tick invalid cpu id");
+
+	match req.extensions().get::<CpuDb>() {
+		Some(cpuserv) => {
+			let mut w_serv = cpuserv.write().unwrap();
+			match w_serv.database.get_mut(&id) {
+				Some(cpu) => { response.send(format!("{}", cpu.last.js_dump())) },
+				None => { response.send("did not find the cpu") },
+			}
+		},
+
+		None => { response.send("did not find cpu serv") },
 	}
 }
 
@@ -194,18 +231,20 @@ fn cpu_run<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'a
 		Some(cpuserv) => {
 			let mut cycles = 0i32;
 			let mut w_serv = cpuserv.write().unwrap();
-			let cpu    = w_serv.database.get_mut(&id).unwrap();
+			let cpu = w_serv.database.get_mut(&id).unwrap();
+			cpu.last = cpu.state;
+
 			loop {
 				if cycles >= MAX_CYCLES { println!("CPU executed > {} cycles.", MAX_CYCLES); break; }
 				cycles += 1;
 
-				match cpu.tick() {
+				match cpu.state.tick() {
 					CpuState::Halt => { break; },
 					CpuState::Continue => { continue; },
 				}
 			}
 
-			response.send(format!("{}", cpu.js_dump()))
+			response.send(format!("{}", cpu.state.js_dump()))
 		},
 		None => { response.send("did not find cpu serv") }
 	}
