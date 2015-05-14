@@ -83,6 +83,10 @@
 						tickMem();
 					});
 
+					$('#rewind-machine').on('click', function(evt) {
+						rewindMem();
+					});
+
 					$('#run-machine').on('click', function(evt) {
 						runMem();
 					});
@@ -134,6 +138,15 @@
 						loadCpu(cpuState);
 					});
 				};
+
+				var rewindMem = function() {
+					return $.post('/cpu/' + cpuId + '/back', function(data) {
+						console.log("cpu ran successfully, loading ...");
+						cpuState = JSON.parse(data);
+						loadCpu(cpuState);
+					});
+				};
+
 				var runMem = function() {
 					return $.post('/cpu/' + cpuId + '/run', function(data) {
 						console.log("cpu ran successfully, loading ...");
@@ -218,6 +231,12 @@
 						The CPU will be forcibly halted at this point; and the current
 						state of the CPU at the last executed instruction will be returned.
 					</p>
+
+					<p class="alert alert-warning">
+						Undo can only rewind one operation. 
+						<br /><br />
+						Your CPU state is snapshotted when you click <strong>Run or Tick.</strong>
+					</p>
 				</div> <!-- end sidebar well -->
 			</div>
 			<div class="footer">
@@ -257,6 +276,7 @@
 				<input id="init-machine" class="btn btn-primary" type="button" value="Load" />
 				<input id="run-machine"  class="btn btn-primary" type="button" value="Run" />
 				<input id="tick-machine"  class="btn btn-primary" type="button" value="Step" >
+				<input id="rewind-machine"  class="btn btn-primary" type="button" value="Undo" >
 			</div>
 		</div>
 		</script>
