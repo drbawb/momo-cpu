@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use serialize::json;
-use serialize::json::{ToJson};
+use rustc_serialize::json::{self, ToJson};
 
 // masks for pulling nibbles out of bytes
-const BYTE_WIDTH: uint = 8;
+const BYTE_WIDTH: usize = 8;
 const U4_LOW:     u8   = 0b00001111;
 const U4_HIGH:    u8   = 0b11110000;
 
@@ -11,7 +10,7 @@ const U4_HIGH:    u8   = 0b11110000;
 /// If the CPU enters the `Halt` state then any additional ticks will result in
 /// the program exhibiting undefined behavior.
 ///
-#[deriving(PartialEq,Show)]
+#[derive(PartialEq,Debug)]
 pub enum CpuState {
 	Continue,
 	Halt,
@@ -24,8 +23,8 @@ pub struct P150Cpu {
 	ip:  u8,
 	ir: u16,
 
-	reg: [u8, ..16],
-	mem: [u8, ..256],
+	reg: [u8;  16],
+	mem: [u8; 256],
 }
 
 impl P150Cpu {
@@ -40,8 +39,8 @@ impl P150Cpu {
 			ip:  0x00,
 			ir:  0x0000,
 
-			reg: [0u8, ..16],
-			mem: [0u8, ..256],
+			reg: [0u8;  16],
+			mem: [0u8; 256],
 		}
 	}
 
@@ -69,7 +68,7 @@ impl P150Cpu {
 		// zero memory
 		self.ip  = 0;
 		self.ir  = 0;
-		self.mem = [0, ..256];
+		self.mem = [0; 256];
 		for op in memory.iter() {
 			let byte_1 = (*op >> 8) as u8;
 			let byte_2 = *op as u8;
@@ -93,7 +92,7 @@ impl P150Cpu {
 				let rloc_o0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_i0 = self.ir as u8;
 
-				self.reg[rloc_o0 as uint] = self.mem[mloc_i0 as uint];
+				self.reg[rloc_o0 as usize] = self.mem[mloc_i0 as usize];
 				CpuState::Continue
 			},
 
@@ -101,7 +100,7 @@ impl P150Cpu {
 				let rloc = lo_nibble((self.ir >> 8) as u8);  // lower nibble of first byte
 				let rval = self.ir as u8;                    // value is entire second byte
 
-				self.reg[rloc as uint] = rval;               // store value in register
+				self.reg[rloc as usize] = rval;               // store value in register
 				CpuState::Continue
 			},
 			
@@ -109,7 +108,7 @@ impl P150Cpu {
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let mloc_o0 = self.ir as u8;
 
-				self.mem[mloc_o0 as uint] = self.reg[rloc_i0 as uint];
+				self.mem[mloc_o0 as usize] = self.reg[rloc_i0 as usize];
 				CpuState::Continue
 			},
 
@@ -117,8 +116,8 @@ impl P150Cpu {
 				let rloc_i0 = hi_nibble(self.ir as u8);
 				let rloc_o0 = lo_nibble(self.ir as u8);
 
-				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0)
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint];
+				debug!("moving from {:02X} to {:02X}", rloc_i0, rloc_o0);
+				self.reg[rloc_o0 as usize] = self.reg[rloc_i0 as usize];
 				CpuState::Continue
 			},
 
@@ -127,8 +126,8 @@ impl P150Cpu {
 				let rloc_i0 = hi_nibble(self.ir as u8);          // second input: upper nibble of second byte
 				let rloc_i1 = lo_nibble(self.ir as u8);          // output: lower nibble of second byte
 
-				self.reg[rloc_o0 as uint] = 
-					((self.reg[rloc_i0 as uint] as i8) + (self.reg[rloc_i1 as uint]as i8)) as u8;
+				self.reg[rloc_o0 as usize] = 
+					((self.reg[rloc_i0 as usize] as i8) + (self.reg[rloc_i1 as usize]as i8)) as u8;
 				CpuState::Continue
 			},
 
@@ -137,7 +136,7 @@ impl P150Cpu {
 				let rloc_i0 = hi_nibble(self.ir as u8);
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] | self.reg[rloc_i1 as uint];
+				self.reg[rloc_o0 as usize] = self.reg[rloc_i0 as usize] | self.reg[rloc_i1 as usize];
 				CpuState::Continue
 			},
 
@@ -146,7 +145,7 @@ impl P150Cpu {
 				let rloc_i0 = hi_nibble(self.ir as u8);
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] & self.reg[rloc_i1 as uint];
+				self.reg[rloc_o0 as usize] = self.reg[rloc_i0 as usize] & self.reg[rloc_i1 as usize];
 				CpuState::Continue
 			},
 
@@ -155,7 +154,7 @@ impl P150Cpu {
 				let rloc_i0 = hi_nibble(self.ir as u8);
 				let rloc_i1 = lo_nibble(self.ir as u8);
 
-				self.reg[rloc_o0 as uint] = self.reg[rloc_i0 as uint] ^ self.reg[rloc_i1 as uint];
+				self.reg[rloc_o0 as usize] = self.reg[rloc_i0 as usize] ^ self.reg[rloc_i1 as usize];
 				CpuState::Continue
 			},
 
@@ -165,9 +164,9 @@ impl P150Cpu {
 				//   LHS is the remaining MSB bits; RHS is the remaining LSB bits
 				//   ∴ LHS <OR> RHS provides a rotated bitstring
 				//
-				let rloc_i0   = lo_nibble((self.ir >> 8) as u8) as uint;          // register is first nibble ...
-				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as uint; // last three bytes of second nibble ...
-				self.reg[rloc_i0 as uint] = (self.reg[rloc_i0] >> swidth) | (self.reg[rloc_i0] << (BYTE_WIDTH - swidth));
+				let rloc_i0   = lo_nibble((self.ir >> 8) as u8) as usize;          // register is first nibble ...
+				let swidth    = (hi_nibble(self.ir as u8) & 0b0000_0111) as usize; // last three bytes of second nibble ...
+				self.reg[rloc_i0 as usize] = (self.reg[rloc_i0] >> swidth) | (self.reg[rloc_i0] << (BYTE_WIDTH - swidth));
 
 				CpuState::Continue
 			},
@@ -176,7 +175,7 @@ impl P150Cpu {
 				let rloc_i0 = lo_nibble((self.ir >> 8) as u8);
 				let next_ip = self.ir as u8;
 
-				if self.reg[rloc_i0 as uint] == self.reg[0] { self.ip = next_ip }
+				if self.reg[rloc_i0 as usize] == self.reg[0] { self.ip = next_ip }
 				CpuState::Continue
 			},
 
@@ -189,10 +188,10 @@ impl P150Cpu {
 	/// The instruction is packed into a single `u16` and stored in the instruction register.
 	fn fetch(&mut self) {
 		// fetch two bytes from PC
-		let byte_1 = self.mem[(self.ip+0) as uint];
-		let byte_2 = self.mem[(self.ip+1) as uint];
+		let byte_1 = self.mem[(self.ip+0) as usize];
+		let byte_2 = self.mem[(self.ip+1) as usize];
 
-		self.ir  = (byte_1 as u16 << 8) | (byte_2 as u16); // load byets into IR
+		self.ir  = ((byte_1 as u16) << 8) | (byte_2 as u16); // load byets into IR
 		self.ip += 2;                                      // increment instruction pointer
 
 		debug!("IR set to 0x{:04X} ({:02X},{:02X})", self.ir, byte_1, byte_2)
@@ -316,7 +315,7 @@ fn test_shift_right() {
 }
 
 #[test]
-#[should_fail]
+#[should_panic]
 fn test_shift_left() {
 	// checks that the program rotates a single nibble 3 places.
 	// this arbitrary shift tests the directionality of the shift; 

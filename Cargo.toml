@@ -4,8 +4,11 @@ name = "p150mod"
 version = "0.0.1"
 authors = ["Robert Straw <drbawb@fatalsyntax.com>"]
 
-[dependencies.http]
-git = "https://github.com/chris-morgan/rust-http"
+[dependencies]
+log = "*"
+plugin = "*"
+rustc-serialize = "*"
+typemap = "*"
 
 [dependencies.nickel]
 git = "https://github.com/nickel-org/nickel.rs"
