@@ -211,7 +211,10 @@ fn cpu_back<'a>(req: &mut Request, response: Response<'a>) -> MiddlewareResult<'
 		Some(cpuserv) => {
 			let mut w_serv = cpuserv.write().unwrap();
 			match w_serv.database.get_mut(&id) {
-				Some(cpu) => { response.send(format!("{}", cpu.last.js_dump())) },
+				Some(cpu) => {
+					cpu.state = cpu.last;
+					response.send(format!("{}", cpu.state.js_dump()))
+				},
 				None => { response.send("did not find the cpu") },
 			}
 		},
