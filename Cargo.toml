@@ -1,7 +1,7 @@
 [package]
 
 name = "p150mod"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Robert Straw <drbawb@fatalsyntax.com>"]
 
 [dependencies]
