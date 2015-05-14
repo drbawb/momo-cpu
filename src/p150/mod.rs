@@ -69,7 +69,7 @@ impl P150Cpu {
 	}
 
 	#[cfg(test)]
-	fn get_reg(&self) -> &[u8] { self.reg.as_slice() }
+	fn get_reg(&self) -> &[u8] { &self.reg[..] }
 
 	/// Read an array of instructions into main memory
 	/// This reads two bytes at a time from the `memory` array
@@ -226,7 +226,7 @@ fn hi_nibble(byte: u8) -> u8 {
 fn test_hammer_time() {
 	// cpu should stop after 1 tick of this program
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0xC000].as_slice());
+	cpu.init_mem(&[0xC000][..]);
 
 	assert_eq!(cpu.tick(), CpuState::Halt)
 }
@@ -235,7 +235,7 @@ fn test_hammer_time() {
 fn test_registers() {
 	// cpu should set, move registers accordingly
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2110, 0x4013, 0xC000].as_slice());
+	cpu.init_mem(&[0x2110, 0x4013, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], 0x10)
@@ -246,7 +246,7 @@ fn test_memory() {
 	// memory sets and memory stores should read back successfully
 	// uninitialized registers should not match initialized registers
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2120, 0x2330, 0x3140, 0x1240, 0xC000].as_slice());
+	cpu.init_mem(&[0x2120, 0x2330, 0x3140, 0x1240, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x1] == cpu.get_reg()[0x2]);
@@ -257,7 +257,7 @@ fn test_memory() {
 fn test_bin() {
 	// tests the various binary operations against their rustc counterparts.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2121, 0x2222, 0x7312, 0x8412, 0x9512, 0xC000].as_slice());
+	cpu.init_mem(&[0x2121, 0x2222, 0x7312, 0x8412, 0x9512, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert!(cpu.get_reg()[0x3] == (0x21 | 0x22));
@@ -269,7 +269,7 @@ fn test_bin() {
 fn test_math() {
 	// tests basic 2s comp. addition
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2120, 0x220A, 0x5312, 0xC000].as_slice());
+	cpu.init_mem(&[0x2120, 0x220A, 0x5312, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
@@ -281,19 +281,19 @@ fn test_math_sub() {
 	// tests basic 2s comp subtraction
 	let mut cpu = P150Cpu::new();
 
-	cpu.init_mem([0x2130, 0x22FA, 0x5312, 0xC000].as_slice());
+	cpu.init_mem(&[0x2130, 0x22FA, 0x5312, 0xC000][..]);
 	boot(&mut cpu);
 
-	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1] + cpu.get_reg()[0x2]);
-	assert_eq!(cpu.get_reg()[0x3], 0x30 + 0xFA);
-	assert_eq!(cpu.get_reg()[0x3], 0x30 - 0x06);
+	assert_eq!(cpu.get_reg()[0x3], cpu.get_reg()[0x1].wrapping_add(cpu.get_reg()[0x2]));
+	assert_eq!(cpu.get_reg()[0x3], 0x30u8.wrapping_add(0xFA));
+	assert_eq!(cpu.get_reg()[0x3], 0x30u8.wrapping_sub(0x06));
 }
 
 #[test]
 fn test_branch() {
 	// checks that the program branches; skipping a halt and setting a status register
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x2021, 0x2121, 0xB108, 0xC000, 0x222A, 0xC000].as_slice());
+	cpu.init_mem(&[0x2021, 0x2121, 0xB108, 0xC000, 0x222A, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x2], 0x2A)
@@ -306,7 +306,7 @@ fn test_shift() {
 	//
 	// NOTE: shifting 12 bits (12 - 8) and 4 bits should be equivalent.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x20B0, 0x21B0, 0xA0C0, 0xA140, 0xC000].as_slice());
+	cpu.init_mem(&[0x20B0, 0x21B0, 0xA0C0, 0xA140, 0xC000][..]);
 	boot(&mut cpu);
 
 	assert_eq!(cpu.get_reg()[0x0], 0x0B);
@@ -319,7 +319,7 @@ fn test_shift_right() {
 	// this arbitrary shift tests the directionality of the shift; 
 	//   which should be TO THE RIGHT.
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x200C, 0xA030, 0xC000].as_slice());
+	cpu.init_mem(&[0x200C, 0xA030, 0xC000][..]);
 	boot(&mut cpu);
 
 	// 0b0000_1100 3-> == 0b1000_0001
@@ -336,7 +336,7 @@ fn test_shift_left() {
 	//
 
 	let mut cpu = P150Cpu::new();
-	cpu.init_mem([0x200C, 0xA030, 0xC000].as_slice());
+	cpu.init_mem(&[0x200C, 0xA030, 0xC000][..]);
 	boot(&mut cpu);
 
 	// 0b0000_1100 <-3 == 0b0110_0000
