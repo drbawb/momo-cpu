@@ -10,7 +10,7 @@ const U4_HIGH:    u8   = 0b11110000;
 /// If the CPU enters the `Halt` state then any additional ticks will result in
 /// the program exhibiting undefined behavior.
 ///
-#[derive(PartialEq,Debug)]
+#[derive(Copy,Clone,PartialEq,Debug)]
 pub enum CpuState {
 	Continue,
 	Halt,
@@ -19,12 +19,25 @@ pub enum CpuState {
 /// The P150 virtual machine
 /// Represents all information the CPU needs to continue executing a
 /// program stored in its main memory.
+#[derive(Copy)]
 pub struct P150Cpu {
 	ip:  u8,
 	ir: u16,
 
 	reg: [u8;  16],
 	mem: [u8; 256],
+}
+
+impl Clone for P150Cpu {
+	fn clone(&self) -> Self {
+		P150Cpu {
+			ip: self.ip,
+			ir: self.ir,
+
+			reg: self.reg,
+			mem: self.mem,
+		}
+	}
 }
 
 impl P150Cpu {
